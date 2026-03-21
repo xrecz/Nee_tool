@@ -1,0 +1,95 @@
+{% extends "base.html" %}
+{% set active = "dashboard" %}
+{% block title %}Dashboard — Nee Tool{% endblock %}
+
+{% block content %}
+<div class="toolbar">
+  <h1>Dashboard</h1>
+  <a href="/scan" class="btn btn-primary">+ Neuer Scan</a>
+</div>
+
+<!-- Running scans -->
+{% if scan_jobs %}
+<h2>Laufende Scans</h2>
+<div class="card">
+<table>
+  <thead><tr><th>Projekt</th><th>Target</th><th>Gestartet</th><th>Status</th><th></th></tr></thead>
+  <tbody>
+  {% for job_id, job in scan_jobs.items() %}
+  <tr>
+    <td><strong>{{ job.name }}</strong></td>
+    <td>{{ job.target }}</td>
+    <td>{{ job.started[:19] }}</td>
+    <td hx-get="/scan/status/{{ job_id }}" hx-trigger="every 3s" hx-swap="innerHTML">
+      {% if job.status == "running" %}
+      <span class="badge badge-running">Läuft...</span>
+      {% elif job.status == "completed" %}
+      <span class="badge badge-success">Fertig</span>
+      <a href="/project?file={{ job.result_file }}" class="btn btn-sm">Öffnen</a>
+      {% endif %}
+    </td>
+    <td>
+      {% if job.status == "completed" and job.result_file %}
+      <a href="/project?file={{ job.result_file }}" class="btn btn-sm btn-primary">Ergebnisse</a>
+      {% endif %}
+    </td>
+  </tr>
+  {% endfor %}
+  </tbody>
+</table>
+</div>
+{% endif %}
+
+<!-- Scanner status -->
+<h2>Scanner-Module</h2>
+<div class="card">
+<table>
+  <thead><tr><th>Scanner</th><th>Status</th></tr></thead>
+  <tbody>
+  {% for name, missing in scanners.items() %}
+  <tr>
+    <td>{{ name }}</td>
+    <td>
+      {% if missing %}
+      <span class="badge badge-warning">fehlt: {{ missing | join(", ") }}</span>
+      {% else %}
+      <span class="badge badge-success">verfügbar</span>
+      {% endif %}
+    </td>
+  </tr>
+  {% endfor %}
+  </tbody>
+</table>
+</div>
+
+<!-- Recent projects -->
+<h2>Projekte</h2>
+{% if projects %}
+<div class="card">
+<table>
+  <thead><tr><th>Projekt</th><th>Target</th><th>Erstellt</th><th>Hosts</th><th>Findings</th><th></th></tr></thead>
+  <tbody>
+  {% for p in projects %}
+  <tr>
+    <td><strong>{{ p.name }}</strong></td>
+    <td>{{ p.target }}</td>
+    <td>{{ p.created }}</td>
+    <td>{{ p.hosts }}</td>
+    <td>{{ p.findings }}</td>
+    <td>
+      <a href="/project?file={{ p.file }}" class="btn btn-sm">Öffnen</a>
+      <a href="/report/form?file={{ p.file }}" class="btn btn-sm">Bericht</a>
+    </td>
+  </tr>
+  {% endfor %}
+  </tbody>
+</table>
+</div>
+{% else %}
+<div class="card empty">
+  <div class="icon">&#128269;</div>
+  <p>Noch keine Projekte. Starte deinen ersten Scan!</p>
+  <a href="/scan" class="btn btn-primary" style="margin-top:1rem;">Scan starten</a>
+</div>
+{% endif %}
+{% endblock %}

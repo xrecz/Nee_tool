@@ -7,7 +7,7 @@ It orchestrates external security tools into a pipeline, generates professional
 PDF reports, and integrates with GoPhish for phishing campaigns.
 
 **Primary language:** Python 3.10+
-**Framework:** CLI via Typer, PDF via WeasyPrint, data models via Pydantic
+**Framework:** CLI via Typer, Web via FastAPI+HTMX, PDF via WeasyPrint, data models via Pydantic
 
 ## Project Structure
 
@@ -26,7 +26,8 @@ src/nee_tool/
 │   ├── security_headers.py   # HTTP security header checks
 │   ├── ssl_check.py          # SSL/TLS analysis (testssl.sh + ssl fallback)
 │   ├── tech_detect.py        # Technology detection (whatweb + signatures)
-│   └── nuclei.py             # Vulnerability scanning (nuclei JSONL parsing)
+│   ├── nuclei.py             # Vulnerability scanning (nuclei JSONL parsing)
+│   └── dir_bruteforce.py     # Directory/file discovery (feroxbuster/ffuf)
 ├── report/
 │   ├── generator.py          # PDF/HTML report generation (WeasyPrint + Jinja2)
 │   ├── finding_templates.py  # 20 pre-defined finding templates (OWASP)
@@ -37,6 +38,10 @@ src/nee_tool/
 │   ├── client.py             # GoPhish REST API client
 │   ├── email_templates.py    # 5 German phishing email templates
 │   └── report.py             # Phishing campaign PDF report generator
+├── web/
+│   ├── app.py                # FastAPI web application (dashboard, scan, report)
+│   ├── templates/            # HTMX/Jinja2 HTML templates for web UI
+│   └── static/               # Static assets
 └── output/
     └── json_export.py        # JSON export for scan results
 ```
@@ -48,7 +53,9 @@ src/nee_tool/
 - **Graceful degradation:** Every scanner has a Python fallback when external tools
   (nmap, subfinder, httpx, etc.) are not installed. Never crash on missing tools.
 - **Pipeline chaining:** Scanners receive `previous_results` and build on them.
-  Order matters: subdomain → portscan → web_discovery → headers/ssl/tech → nuclei.
+  Order matters: subdomain → portscan → web_discovery → headers/ssl/tech → nuclei → dir_bruteforce.
+- **Web UI:** FastAPI + HTMX for a lightweight interactive dashboard. No frontend
+  framework needed. Templates in `web/templates/`, server-side rendered.
 - **Pydantic models:** All data flows through typed models (`Project`, `ScanResult`,
   `Finding`, `HostInfo`). JSON serialization is free via `model_dump()`.
 
@@ -72,6 +79,10 @@ nee phish status <id> --api-key KEY
 nee phish report <id> --api-key KEY --client "Firma"
 nee phish templates                # List email templates
 nee phish demo-report              # Preview with sample data
+
+# Web UI
+nee web                            # Start dashboard on port 8899
+nee web --port 3000                # Custom port
 
 # Info
 nee scanners                       # Show available scanner modules

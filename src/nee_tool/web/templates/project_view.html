@@ -1,0 +1,136 @@
+{% extends "base.html" %}
+{% set active = "dashboard" %}
+{% block title %}{{ project.name }} — Nee Tool{% endblock %}
+
+{% block content %}
+<div class="toolbar">
+  <div>
+    <h1>{{ project.name }}</h1>
+    <span style="color:var(--fg2);">Target: {{ project.target }} | {{ project.created_at.__str__()[:19] }}</span>
+  </div>
+  <div style="display:flex;gap:0.5rem;">
+    <a href="/project/add-finding?file={{ file }}" class="btn">+ Finding</a>
+    <a href="/report/form?file={{ file }}" class="btn btn-primary">Bericht generieren</a>
+  </div>
+</div>
+
+<!-- Stats -->
+{% set sev_counts = {} %}
+{% for f in findings %}
+  {% if f.severity.value in sev_counts %}
+    {% set _ = sev_counts.update({f.severity.value: sev_counts[f.severity.value] + 1}) %}
+  {% else %}
+    {% set _ = sev_counts.update({f.severity.value: 1}) %}
+  {% endif %}
+{% endfor %}
+
+<div class="grid grid-5">
+  <div class="stat stat-critical">
+    <span class="number">{{ sev_counts.get("critical", 0) }}</span>
+    <span class="label">Critical</span>
+  </div>
+  <div class="stat stat-high">
+    <span class="number">{{ sev_counts.get("high", 0) }}</span>
+    <span class="label">High</span>
+  </div>
+  <div class="stat stat-medium">
+    <span class="number">{{ sev_counts.get("medium", 0) }}</span>
+    <span class="label">Medium</span>
+  </div>
+  <div class="stat stat-low">
+    <span class="number">{{ sev_counts.get("low", 0) }}</span>
+    <span class="label">Low</span>
+  </div>
+  <div class="stat stat-info">
+    <span class="number">{{ sev_counts.get("info", 0) }}</span>
+    <span class="label">Info</span>
+  </div>
+</div>
+
+<!-- Scanner Results -->
+<h2>Scanner-Ergebnisse</h2>
+<div class="card">
+<table>
+  <thead><tr><th>Scanner</th><th>Status</th><th>Dauer</th><th>Ergebnis</th></tr></thead>
+  <tbody>
+  {% for r in project.scan_results %}
+  <tr>
+    <td>{{ r.scanner_name }}</td>
+    <td><span class="badge badge-{% if r.status.value == 'completed' %}success{% elif r.status.value == 'failed' %}critical{% else %}warning{% endif %}">{{ r.status.value }}</span></td>
+    <td>{{ r.duration_seconds }}s</td>
+    <td>
+      {% if r.hosts %}{{ r.hosts | length }} Hosts{% endif %}
+      {% if r.subdomains %} {{ r.subdomains | length }} Subdomains{% endif %}
+      {% if r.findings %} {{ r.findings | length }} Findings{% endif %}
+      {% if r.error %}<span style="color:var(--red)">{{ r.error[:60] }}</span>{% endif %}
+    </td>
+  </tr>
+  {% endfor %}
+  </tbody>
+</table>
+</div>
+
+<!-- Hosts -->
+{% if hosts %}
+<h2>Entdeckte Hosts ({{ hosts | length }})</h2>
+<div class="card">
+<table>
+  <thead><tr><th>Host</th><th>IP</th><th>Ports</th><th>Web</th><th>Technologien</th></tr></thead>
+  <tbody>
+  {% for key, host in hosts.items() %}
+  <tr>
+    <td><strong>{{ host.hostname }}</strong></td>
+    <td style="font-family:monospace;">{{ host.ip or "-" }}</td>
+    <td style="font-family:monospace;">
+      {% for p in host.ports[:8] %}{{ p.port }}{% if not loop.last %}, {% endif %}{% endfor %}
+      {% if host.ports | length > 8 %}+{{ host.ports | length - 8 }}{% endif %}
+      {% if not host.ports %}-{% endif %}
+    </td>
+    <td>{% if host.is_web %}<span class="badge badge-success">Ja</span>{% else %}-{% endif %}</td>
+    <td>{% for t in host.technologies[:4] %}<span class="tag">{{ t }}</span>{% endfor %}</td>
+  </tr>
+  {% endfor %}
+  </tbody>
+</table>
+</div>
+{% endif %}
+
+<!-- Subdomains -->
+{% if subdomains %}
+<h2>Subdomains ({{ subdomains | length }})</h2>
+<div class="card">
+  <div style="display:flex;flex-wrap:wrap;gap:0.4rem;">
+    {% for sub in subdomains %}
+    <span class="tag" style="font-family:monospace;">{{ sub }}</span>
+    {% endfor %}
+  </div>
+</div>
+{% endif %}
+
+<!-- Findings -->
+<h2>Findings ({{ findings | length }})</h2>
+{% if findings %}
+  {% for f in findings %}
+  <div class="finding finding-{{ f.severity.value }}">
+    <div style="display:flex;justify-content:space-between;align-items:center;">
+      <div class="title">{{ f.title }}</div>
+      <span class="badge badge-{{ f.severity.value }}">{{ f.severity.value | upper }}</span>
+    </div>
+    <div class="desc">{{ f.description }}</div>
+    {% if f.evidence %}
+    <div class="evidence">{{ f.evidence }}</div>
+    {% endif %}
+    {% if f.recommendation %}
+    <div class="recommendation">{{ f.recommendation }}</div>
+    {% endif %}
+    {% if f.tags %}
+    <div class="tags">{% for t in f.tags %}<span class="tag">{{ t }}</span>{% endfor %}</div>
+    {% endif %}
+  </div>
+  {% endfor %}
+{% else %}
+<div class="card empty">
+  <p>Keine Findings. <a href="/project/add-finding?file={{ file }}">Manuell hinzufügen</a></p>
+</div>
+{% endif %}
+{% endblock %}

@@ -1,0 +1,146 @@
+<!DOCTYPE html>
+<html lang="de" data-theme="dark">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>{% block title %}Nee Tool{% endblock %}</title>
+<script src="https://unpkg.com/htmx.org@1.9.12"></script>
+<style>
+  :root {
+    --bg: #0f1117; --bg2: #1a1d27; --bg3: #242836;
+    --fg: #e1e4ed; --fg2: #8b8fa3; --accent: #4f8ff7;
+    --green: #34d399; --yellow: #fbbf24; --red: #f87171; --orange: #fb923c;
+    --border: #2e3346; --radius: 8px;
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body { font-family: -apple-system, "Segoe UI", Roboto, sans-serif; background: var(--bg); color: var(--fg); line-height: 1.6; }
+
+  /* Layout */
+  .shell { display: flex; min-height: 100vh; }
+  .sidebar { width: 240px; background: var(--bg2); border-right: 1px solid var(--border); padding: 1.5rem 0; flex-shrink: 0; }
+  .sidebar .logo { padding: 0 1.5rem; font-size: 1.3rem; font-weight: 700; color: var(--accent); margin-bottom: 2rem; letter-spacing: -0.5px; }
+  .sidebar .logo span { color: var(--fg2); font-weight: 400; font-size: 0.75rem; display: block; }
+  .sidebar nav a {
+    display: flex; align-items: center; gap: 0.7rem; padding: 0.6rem 1.5rem;
+    color: var(--fg2); text-decoration: none; font-size: 0.9rem; transition: all 0.15s;
+  }
+  .sidebar nav a:hover, .sidebar nav a.active { color: var(--fg); background: var(--bg3); }
+  .sidebar nav a.active { border-right: 3px solid var(--accent); }
+  .main { flex: 1; padding: 2rem; max-width: 1200px; }
+
+  /* Typography */
+  h1 { font-size: 1.5rem; margin-bottom: 1.5rem; }
+  h2 { font-size: 1.2rem; margin: 1.5rem 0 0.8rem; color: var(--fg); }
+  h3 { font-size: 1rem; margin: 1rem 0 0.5rem; color: var(--fg2); }
+
+  /* Cards */
+  .card { background: var(--bg2); border: 1px solid var(--border); border-radius: var(--radius); padding: 1.2rem; margin-bottom: 1rem; }
+  .card-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 0.8rem; }
+
+  /* Grid */
+  .grid { display: grid; gap: 1rem; }
+  .grid-2 { grid-template-columns: 1fr 1fr; }
+  .grid-3 { grid-template-columns: 1fr 1fr 1fr; }
+  .grid-4 { grid-template-columns: 1fr 1fr 1fr 1fr; }
+  .grid-5 { grid-template-columns: 1fr 1fr 1fr 1fr 1fr; }
+
+  /* Stat cards */
+  .stat { text-align: center; padding: 1rem; border-radius: var(--radius); }
+  .stat .number { font-size: 2rem; font-weight: 700; display: block; }
+  .stat .label { font-size: 0.75rem; text-transform: uppercase; letter-spacing: 1px; color: var(--fg2); }
+  .stat-critical { background: rgba(248,113,113,0.15); color: var(--red); }
+  .stat-high { background: rgba(251,146,60,0.15); color: var(--orange); }
+  .stat-medium { background: rgba(251,191,36,0.15); color: var(--yellow); }
+  .stat-low { background: rgba(79,143,247,0.15); color: var(--accent); }
+  .stat-info { background: rgba(139,143,163,0.15); color: var(--fg2); }
+
+  /* Tables */
+  table { width: 100%; border-collapse: collapse; font-size: 0.9rem; }
+  th { text-align: left; padding: 0.6rem 0.8rem; border-bottom: 2px solid var(--border); color: var(--fg2); font-weight: 600; font-size: 0.8rem; text-transform: uppercase; letter-spacing: 0.5px; }
+  td { padding: 0.6rem 0.8rem; border-bottom: 1px solid var(--border); }
+  tr:hover { background: var(--bg3); }
+
+  /* Badges */
+  .badge { display: inline-block; padding: 0.15rem 0.6rem; border-radius: 20px; font-size: 0.75rem; font-weight: 600; }
+  .badge-critical { background: rgba(248,113,113,0.2); color: var(--red); }
+  .badge-high { background: rgba(251,146,60,0.2); color: var(--orange); }
+  .badge-medium { background: rgba(251,191,36,0.2); color: var(--yellow); }
+  .badge-low { background: rgba(79,143,247,0.2); color: var(--accent); }
+  .badge-info { background: rgba(139,143,163,0.2); color: var(--fg2); }
+  .badge-success { background: rgba(52,211,153,0.2); color: var(--green); }
+  .badge-warning { background: rgba(251,191,36,0.2); color: var(--yellow); }
+  .badge-running { background: rgba(79,143,247,0.2); color: var(--accent); animation: pulse 1.5s infinite; }
+  @keyframes pulse { 0%,100% { opacity: 1; } 50% { opacity: 0.5; } }
+
+  /* Buttons */
+  .btn {
+    display: inline-flex; align-items: center; gap: 0.4rem; padding: 0.5rem 1rem;
+    border: 1px solid var(--border); border-radius: var(--radius); background: var(--bg3);
+    color: var(--fg); font-size: 0.85rem; cursor: pointer; text-decoration: none; transition: all 0.15s;
+  }
+  .btn:hover { background: var(--border); }
+  .btn-primary { background: var(--accent); border-color: var(--accent); color: white; }
+  .btn-primary:hover { opacity: 0.9; }
+  .btn-danger { background: rgba(248,113,113,0.15); border-color: var(--red); color: var(--red); }
+  .btn-sm { padding: 0.3rem 0.6rem; font-size: 0.8rem; }
+
+  /* Forms */
+  .form-group { margin-bottom: 1rem; }
+  .form-group label { display: block; font-size: 0.85rem; color: var(--fg2); margin-bottom: 0.3rem; }
+  input[type="text"], input[type="number"], input[type="password"], select, textarea {
+    width: 100%; padding: 0.5rem 0.8rem; background: var(--bg); border: 1px solid var(--border);
+    border-radius: var(--radius); color: var(--fg); font-size: 0.9rem; font-family: inherit;
+  }
+  input:focus, select:focus, textarea:focus { outline: none; border-color: var(--accent); }
+  textarea { min-height: 80px; resize: vertical; }
+  .checkbox-group { display: flex; flex-wrap: wrap; gap: 0.5rem; }
+  .checkbox-group label { display: flex; align-items: center; gap: 0.3rem; padding: 0.3rem 0.7rem; background: var(--bg); border: 1px solid var(--border); border-radius: var(--radius); cursor: pointer; font-size: 0.85rem; }
+  .checkbox-group input:checked + span { color: var(--accent); }
+
+  /* Finding cards */
+  .finding { border-left: 3px solid; padding: 0.8rem 1rem; margin-bottom: 0.8rem; background: var(--bg2); border-radius: 0 var(--radius) var(--radius) 0; }
+  .finding-critical { border-color: var(--red); }
+  .finding-high { border-color: var(--orange); }
+  .finding-medium { border-color: var(--yellow); }
+  .finding-low { border-color: var(--accent); }
+  .finding-info { border-color: var(--fg2); }
+  .finding .title { font-weight: 600; margin-bottom: 0.3rem; }
+  .finding .desc { font-size: 0.85rem; color: var(--fg2); }
+  .finding .evidence { background: var(--bg); padding: 0.5rem; border-radius: 4px; font-family: monospace; font-size: 0.8rem; color: var(--green); margin: 0.5rem 0; white-space: pre-wrap; word-break: break-all; }
+  .finding .recommendation { background: rgba(52,211,153,0.08); border-left: 2px solid var(--green); padding: 0.5rem; font-size: 0.85rem; margin-top: 0.5rem; white-space: pre-wrap; }
+  .finding .tags { margin-top: 0.5rem; }
+  .tag { display: inline-block; padding: 0.1rem 0.4rem; background: var(--bg3); border-radius: 3px; font-size: 0.7rem; color: var(--fg2); margin-right: 0.3rem; }
+
+  /* Empty state */
+  .empty { text-align: center; padding: 3rem; color: var(--fg2); }
+  .empty .icon { font-size: 2rem; margin-bottom: 0.5rem; }
+
+  /* Toolbar */
+  .toolbar { display: flex; justify-content: space-between; align-items: center; margin-bottom: 1.5rem; flex-wrap: wrap; gap: 0.5rem; }
+
+  /* Responsive */
+  @media (max-width: 768px) {
+    .shell { flex-direction: column; }
+    .sidebar { width: 100%; border-right: none; border-bottom: 1px solid var(--border); }
+    .sidebar nav { display: flex; overflow-x: auto; }
+    .sidebar nav a { white-space: nowrap; }
+    .grid-2, .grid-3, .grid-4, .grid-5 { grid-template-columns: 1fr; }
+  }
+</style>
+</head>
+<body>
+<div class="shell">
+  <aside class="sidebar">
+    <div class="logo">Nee Tool<span>Pentest Toolkit v0.1</span></div>
+    <nav>
+      <a href="/" {% if active == "dashboard" %}class="active"{% endif %}>&#9632; Dashboard</a>
+      <a href="/scan" {% if active == "scan" %}class="active"{% endif %}>&#9654; Neuer Scan</a>
+      <a href="/templates" {% if active == "templates" %}class="active"{% endif %}>&#9830; Templates</a>
+    </nav>
+  </aside>
+  <main class="main">
+    {% block content %}{% endblock %}
+  </main>
+</div>
+</body>
+</html>

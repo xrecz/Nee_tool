@@ -1,0 +1,24 @@
+{% extends "base.html" %}
+{% set active = "templates" %}
+{% block title %}Finding-Templates — Nee Tool{% endblock %}
+
+{% block content %}
+<h1>Finding-Templates ({{ templates | length }})</h1>
+<p style="color:var(--fg2);margin-bottom:1.5rem;">Vordefinierte Schwachstellen-Beschreibungen mit Empfehlungen. Wähle ein Template beim Hinzufügen eines Findings.</p>
+
+{% for key, f in templates.items() %}
+<div class="finding finding-{{ f.severity.value }}">
+  <div style="display:flex;justify-content:space-between;align-items:center;">
+    <div class="title">{{ f.title }} <span style="color:var(--fg2);font-weight:400;font-size:0.8rem;">{{ key }}</span></div>
+    <span class="badge badge-{{ f.severity.value }}">{{ f.severity.value | upper }}</span>
+  </div>
+  <div class="desc">{{ f.description[:200] }}{% if f.description | length > 200 %}...{% endif %}</div>
+  {% if f.recommendation %}
+  <div class="recommendation">{{ f.recommendation }}</div>
+  {% endif %}
+  {% if f.tags %}
+  <div class="tags">{% for t in f.tags %}<span class="tag">{{ t }}</span>{% endfor %}</div>
+  {% endif %}
+</div>
+{% endfor %}
+{% endblock %}

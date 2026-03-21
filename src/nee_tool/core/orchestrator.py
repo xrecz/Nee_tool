@@ -16,6 +16,7 @@ from rich.table import Table
 from nee_tool.core.config import Config
 from nee_tool.core.models import Project, ScanStatus, Severity
 from nee_tool.scanners.base import BaseScanner
+from nee_tool.scanners.dir_bruteforce import DirBruteforceScanner
 from nee_tool.scanners.nuclei import NucleiScanner
 from nee_tool.scanners.portscan import PortScanner
 from nee_tool.scanners.security_headers import SecurityHeadersScanner
@@ -35,6 +36,7 @@ SCANNER_REGISTRY: dict[str, type[BaseScanner]] = {
     "ssl_check": SSLCheckScanner,
     "tech_detect": TechDetectScanner,
     "nuclei": NucleiScanner,
+    "dir_bruteforce": DirBruteforceScanner,
 }
 
 

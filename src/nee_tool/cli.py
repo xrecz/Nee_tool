@@ -90,6 +90,19 @@ def scanners() -> None:
 
 
 @app.command()
+def web(
+    host: str = typer.Option("127.0.0.1", "--host", "-h", help="Bind address"),
+    port: int = typer.Option(8899, "--port", "-p", help="Port"),
+    reload: bool = typer.Option(False, "--reload", help="Auto-reload on code changes"),
+) -> None:
+    """Start the web UI dashboard."""
+    import uvicorn
+
+    console.print(f"[bold cyan]Nee Tool Web-UI[/bold cyan] → http://{host}:{port}")
+    uvicorn.run("nee_tool.web.app:app", host=host, port=port, reload=reload)
+
+
+@app.command()
 def info(
     project_file: str = typer.Argument(help="Path to a project JSON file"),
 ) -> None:

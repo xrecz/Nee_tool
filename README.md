@@ -7,7 +7,7 @@ Entwickelt für Pentest-Dienstleister im DACH-Raum.
 ## Features
 
 ### Recon-Pipeline
-Automatisierte Reconnaissance mit 7 verketteten Scanner-Modulen:
+Automatisierte Reconnaissance mit 8 verketteten Scanner-Modulen:
 
 | Modul | Funktion | Externe Tools | Fallback |
 |-------|----------|---------------|----------|
@@ -18,6 +18,7 @@ Automatisierte Reconnaissance mit 7 verketteten Scanner-Modulen:
 | `ssl_check` | SSL/TLS-Analyse | testssl.sh | Python ssl |
 | `tech_detect` | Technologie-Erkennung | whatweb | Signatur-basiert (17 Patterns) |
 | `nuclei` | CVE/Schwachstellen-Scan | nuclei | — |
+| `dir_bruteforce` | Directory/File Discovery | feroxbuster / ffuf | — |
 
 Jeder Scanner baut auf den Ergebnissen der vorherigen auf. Fehlende Tools werden automatisch erkannt und übersprungen.
 
@@ -39,6 +40,19 @@ Vollständige Steuerung von Phishing-Kampagnen über die CLI:
 - 5 deutsche E-Mail-Templates (IT-Support, M365, Bewerbung, Rechnung, DHL)
 - Live-Status-Tracking
 - Professioneller Kampagnen-Bericht (PDF) mit Conversion-Funnel und Benchmarking
+
+### Web-Dashboard
+Interne Web-Oberfläche (Dark Mode) für den täglichen Einsatz:
+- Dashboard mit Projektübersicht und Scanner-Status
+- Scans direkt im Browser starten (HTMX live-Polling)
+- Scan-Ergebnisse durchsuchen: Hosts, Subdomains, Findings
+- Findings manuell hinzufügen (aus Templates oder frei)
+- PDF-/HTML-Berichte per Klick generieren und herunterladen
+
+```bash
+nee web              # Startet auf http://127.0.0.1:8899
+nee web --port 3000  # Eigener Port
+```
 
 ## Installation
 
@@ -158,6 +172,27 @@ max.mustermann@example.de,Max,Mustermann,IT-Leiter
 anna.schmidt@example.de,Anna,Schmidt,Buchhaltung
 ```
 
+### Web-Dashboard
+
+```bash
+# Starten
+nee web
+
+# Eigener Port
+nee web --port 3000
+
+# Mit Auto-Reload (Entwicklung)
+nee web --reload
+```
+
+Funktionen im Dashboard:
+- **Projekte**: Alle bisherigen Scans mit Findings/Hosts-Übersicht
+- **Neuer Scan**: Target eingeben, Scanner-Module wählen, Scan starten
+- **Live-Status**: HTMX pollt automatisch den Scan-Fortschritt
+- **Ergebnis-Ansicht**: Hosts, Ports, Technologien, Subdomains, Findings
+- **Finding hinzufügen**: Manuell oder aus Template-Bibliothek
+- **Bericht generieren**: Kundenname + Autor eingeben, PDF/HTML herunterladen
+
 ## Projektstruktur
 
 ```
@@ -175,7 +210,8 @@ src/nee_tool/
 │   ├── security_headers.py
 │   ├── ssl_check.py
 │   ├── tech_detect.py
-│   └── nuclei.py
+│   ├── nuclei.py
+│   └── dir_bruteforce.py
 ├── report/                    # Pentest-Berichte
 │   ├── generator.py           # PDF/HTML-Erzeugung
 │   ├── finding_templates.py   # Finding-Vorlagen
@@ -185,6 +221,9 @@ src/nee_tool/
 │   ├── client.py              # REST-API-Client
 │   ├── email_templates.py     # Phishing-E-Mail-Vorlagen
 │   └── report.py              # Kampagnen-Berichte
+├── web/                       # Web-Dashboard
+│   ├── app.py                 # FastAPI-App
+│   └── templates/             # HTMX/Jinja2-Templates
 └── output/
     └── json_export.py         # JSON-Export
 ```
