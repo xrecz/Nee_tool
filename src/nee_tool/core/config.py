@@ -33,6 +33,12 @@ class ScanConfig(BaseModel):
     httpx_threads: int = 50
     httpx_timeout: int = 10
 
+    # Nuclei
+    nuclei_severity: str = ""  # e.g. "critical,high,medium" — empty = all
+    nuclei_templates: str = ""  # custom templates path
+    nuclei_rate_limit: int = 100
+    nuclei_tags: str = "cve,misconfig,exposure,vuln"
+
     # General
     max_concurrent: int = 5
     timeout_per_scanner: int = 600  # 10 min default
@@ -48,6 +54,7 @@ class PipelineConfig(BaseModel):
         "security_headers",
         "ssl_check",
         "tech_detect",
+        "nuclei",
     ])
 
 

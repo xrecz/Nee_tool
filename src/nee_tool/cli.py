@@ -320,5 +320,222 @@ def demo_report(
         console.print(f"[bold green]Demo PDF-Bericht erstellt:[/bold green] {out}")
 
 
+# ── GoPhish / Phishing Commands ──────────────────────────────
+
+phish_app = typer.Typer(name="phish", help="GoPhish Phishing-Kampagnen verwalten", no_args_is_help=True)
+app.add_typer(phish_app)
+
+
+@phish_app.command("setup")
+def phish_setup(
+    host: str = typer.Option("https://localhost:3333", "--host", help="GoPhish server URL"),
+    api_key: str = typer.Option(..., "--api-key", "-k", help="GoPhish API key"),
+    template_key: str = typer.Option("it_password_reset", "--template", "-t", help="Email template key"),
+    smtp_host: str = typer.Option(..., "--smtp-host", help="SMTP server (host:port)"),
+    smtp_from: str = typer.Option(..., "--smtp-from", help="Sender address"),
+    smtp_user: str = typer.Option("", "--smtp-user", help="SMTP username"),
+    smtp_pass: str = typer.Option("", "--smtp-pass", help="SMTP password"),
+    targets_csv: str = typer.Option(..., "--targets", help="CSV file with targets (email,first_name,last_name,position)"),
+    campaign_name: str = typer.Option(..., "--name", "-n", help="Campaign name"),
+    phish_url: str = typer.Option(..., "--url", "-u", help="Phishing URL (GoPhish listener)"),
+    landing_redirect: str = typer.Option("https://www.google.com", "--redirect", help="Redirect URL after credential capture"),
+) -> None:
+    """Set up and launch a complete phishing campaign in one command."""
+    from nee_tool.phishing.client import (
+        Campaign, EmailTemplate, GoPhishClient, GoPhishConfig,
+        GoPhishError, LandingPage, SMTPProfile,
+    )
+    from nee_tool.phishing.email_templates import get_template
+
+    config = GoPhishConfig(host=host, api_key=api_key)
+    client = GoPhishClient(config)
+
+    try:
+        # 1. SMTP Profile
+        console.print("[bold]1/5[/bold] Erstelle SMTP-Profil...")
+        smtp = client.create_smtp(SMTPProfile(
+            name=f"{campaign_name}_smtp",
+            host=smtp_host,
+            from_address=smtp_from,
+            username=smtp_user,
+            password=smtp_pass,
+        ))
+        console.print(f"  [green]✓[/green] SMTP-Profil erstellt (ID: {smtp.id})")
+
+        # 2. Email Template
+        console.print("[bold]2/5[/bold] Erstelle E-Mail-Template...")
+        phish_tpl = get_template(template_key)
+        if not phish_tpl:
+            console.print(f"  [red]Template '{template_key}' nicht gefunden. Verfügbar: nee phish templates[/red]")
+            raise typer.Exit(1)
+
+        email_tpl = client.create_template(EmailTemplate(
+            name=f"{campaign_name}_email",
+            subject=phish_tpl.subject,
+            html=phish_tpl.html,
+            text=phish_tpl.text,
+        ))
+        console.print(f"  [green]✓[/green] E-Mail-Template '{phish_tpl.name}' (ID: {email_tpl.id})")
+
+        # 3. Landing Page
+        console.print("[bold]3/5[/bold] Erstelle Landing Page...")
+        page = client.create_page(LandingPage(
+            name=f"{campaign_name}_page",
+            html='<html><body><form method="POST"><input name="username" placeholder="Benutzername"><br><input name="password" type="password" placeholder="Passwort"><br><button type="submit">Anmelden</button></form></body></html>',
+            capture_credentials=True,
+            capture_passwords=True,
+            redirect_url=landing_redirect,
+        ))
+        console.print(f"  [green]✓[/green] Landing Page erstellt (ID: {page.id})")
+
+        # 4. Target Group
+        console.print("[bold]4/5[/bold] Importiere Ziele...")
+        group = client.import_targets_csv(f"{campaign_name}_targets", targets_csv)
+        console.print(f"  [green]✓[/green] {len(group.targets)} Ziele importiert (ID: {group.id})")
+
+        # 5. Campaign
+        console.print("[bold]5/5[/bold] Starte Kampagne...")
+        campaign = Campaign(
+            name=campaign_name,
+            template=email_tpl,
+            page=page,
+            smtp=smtp,
+            groups=[group],
+            url=phish_url,
+        )
+        result = client.create_campaign(campaign)
+        console.print(f"  [green]✓[/green] Kampagne gestartet! (ID: {result.get('id')})")
+        console.print()
+        console.print(f"[bold green]Kampagne '{campaign_name}' läuft![/bold green]")
+        console.print(f"  Status prüfen: nee phish status {result.get('id')} --host {host} --api-key <key>")
+
+    except GoPhishError as e:
+        console.print(f"[red]GoPhish Fehler: {e}[/red]")
+        raise typer.Exit(1)
+
+
+@phish_app.command("status")
+def phish_status(
+    campaign_id: int = typer.Argument(help="Campaign ID"),
+    host: str = typer.Option("https://localhost:3333", "--host", help="GoPhish server URL"),
+    api_key: str = typer.Option(..., "--api-key", "-k", help="GoPhish API key"),
+) -> None:
+    """Show current status of a phishing campaign."""
+    from rich.table import Table
+
+    from nee_tool.phishing.client import GoPhishClient, GoPhishConfig, GoPhishError
+
+    config = GoPhishConfig(host=host, api_key=api_key)
+    client = GoPhishClient(config)
+
+    try:
+        result = client.get_campaign_results(campaign_id)
+    except GoPhishError as e:
+        console.print(f"[red]Fehler: {e}[/red]")
+        raise typer.Exit(1)
+
+    total = max(result.total_targets, 1)
+
+    console.print(f"[bold]Kampagne:[/bold] {result.name}")
+    console.print(f"[bold]Status:[/bold]   {result.status}")
+    console.print(f"[bold]Gestartet:[/bold] {result.launch_date}")
+    console.print()
+
+    table = Table(title="Ergebnisse", show_header=True)
+    table.add_column("Metrik")
+    table.add_column("Anzahl", justify="right")
+    table.add_column("Rate", justify="right")
+
+    table.add_row("Ziele gesamt", str(result.total_targets), "-")
+    table.add_row("E-Mails gesendet", str(result.emails_sent), f"{result.emails_sent/total*100:.1f}%")
+    table.add_row("E-Mails geöffnet", str(result.emails_opened), f"{result.emails_opened/total*100:.1f}%")
+    table.add_row("[bold yellow]Links geklickt[/bold yellow]", str(result.links_clicked), f"[bold yellow]{result.links_clicked/total*100:.1f}%[/bold yellow]")
+    table.add_row("[bold red]Credentials eingegeben[/bold red]", str(result.credentials_submitted), f"[bold red]{result.credentials_submitted/total*100:.1f}%[/bold red]")
+    table.add_row("Fehler", str(result.errors), f"{result.errors/total*100:.1f}%")
+
+    console.print(table)
+
+
+@phish_app.command("report")
+def phish_report(
+    campaign_id: int = typer.Argument(help="Campaign ID"),
+    host: str = typer.Option("https://localhost:3333", "--host", help="GoPhish server URL"),
+    api_key: str = typer.Option(..., "--api-key", "-k", help="GoPhish API key"),
+    client_name: str = typer.Option("", "--client", "-c", help="Client name for the report"),
+    author: str = typer.Option("Security Team", "--author", "-a", help="Report author"),
+    output: str = typer.Option("", "--output", "-o", help="Output path"),
+    html_only: bool = typer.Option(False, "--html-only", help="Generate HTML instead of PDF"),
+) -> None:
+    """Generate a PDF report for a phishing campaign."""
+    from nee_tool.phishing.client import GoPhishClient, GoPhishConfig, GoPhishError
+    from nee_tool.phishing.report import generate_phishing_report
+
+    config = GoPhishConfig(host=host, api_key=api_key)
+    gophish = GoPhishClient(config)
+
+    try:
+        result = gophish.get_campaign_results(campaign_id)
+    except GoPhishError as e:
+        console.print(f"[red]Fehler: {e}[/red]")
+        raise typer.Exit(1)
+
+    if not output:
+        output = f"./output/phishing_{result.name}_{campaign_id}.pdf"
+
+    out = generate_phishing_report(
+        result, output, client=client_name, author=author, html_only=html_only,
+    )
+    console.print(f"[bold green]Phishing-Bericht erstellt:[/bold green] {out}")
+
+
+@phish_app.command("templates")
+def phish_templates() -> None:
+    """List all available phishing email templates."""
+    from rich.table import Table
+
+    from nee_tool.phishing.email_templates import PHISH_TEMPLATES
+
+    table = Table(title="Phishing E-Mail-Templates", show_header=True)
+    table.add_column("Key", style="cyan")
+    table.add_column("Kategorie")
+    table.add_column("Name")
+    table.add_column("Beschreibung", max_width=40)
+
+    for key, tpl in PHISH_TEMPLATES.items():
+        table.add_row(key, tpl.category, tpl.name, tpl.description)
+
+    console.print(table)
+    console.print(f"\n[bold]{len(PHISH_TEMPLATES)}[/bold] Templates verfügbar")
+
+
+@phish_app.command("demo-report")
+def phish_demo_report(
+    output: str = typer.Option("./output/phishing_demo.pdf", "--output", "-o"),
+    html_only: bool = typer.Option(False, "--html-only"),
+) -> None:
+    """Generate a demo phishing report with sample data."""
+    from nee_tool.phishing.client import CampaignResult
+    from nee_tool.phishing.report import generate_phishing_report
+
+    result = CampaignResult(
+        id=42,
+        name="Awareness-Test Q1/2026",
+        status="Completed",
+        created_date="2026-03-01T08:00:00Z",
+        launch_date="2026-03-01T09:00:00Z",
+        total_targets=150,
+        emails_sent=148,
+        emails_opened=89,
+        links_clicked=34,
+        credentials_submitted=12,
+        errors=2,
+    )
+
+    out = generate_phishing_report(
+        result, output, client="Demo GmbH", author="Security Team", html_only=html_only,
+    )
+    console.print(f"[bold green]Demo Phishing-Bericht erstellt:[/bold green] {out}")
+
+
 if __name__ == "__main__":
     app()
