@@ -1,0 +1,463 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+<meta charset="utf-8">
+<title>Penetrationstest Bericht — {{ project.name }}</title>
+<style>
+  @page {
+    size: A4;
+    margin: 2.5cm 2cm;
+    @bottom-center {
+      content: "Seite " counter(page) " von " counter(pages);
+      font-size: 9px;
+      color: #888;
+    }
+    @bottom-right {
+      content: "Vertraulich";
+      font-size: 9px;
+      color: #c00;
+    }
+  }
+
+  @page :first {
+    margin-top: 0;
+    @bottom-center { content: ""; }
+    @bottom-right { content: ""; }
+  }
+
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+
+  body {
+    font-family: "Segoe UI", "Helvetica Neue", Arial, sans-serif;
+    font-size: 10.5pt;
+    line-height: 1.5;
+    color: #222;
+  }
+
+  /* ── Cover Page ─────────────────────────────── */
+  .cover {
+    page-break-after: always;
+    height: 100vh;
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    padding: 3cm 2cm;
+    background: linear-gradient(135deg, #1a1a2e 0%, #16213e 50%, #0f3460 100%);
+    color: white;
+    margin: -2.5cm -2cm;
+  }
+  .cover h1 {
+    font-size: 32pt;
+    font-weight: 700;
+    margin-bottom: 0.3em;
+    letter-spacing: -0.5px;
+  }
+  .cover .subtitle {
+    font-size: 16pt;
+    font-weight: 300;
+    opacity: 0.9;
+    margin-bottom: 2em;
+  }
+  .cover .meta {
+    font-size: 11pt;
+    line-height: 2;
+    opacity: 0.8;
+  }
+  .cover .meta strong { opacity: 1; }
+  .cover .classification {
+    margin-top: 3em;
+    padding: 0.8em 1.2em;
+    border: 2px solid rgba(255,255,255,0.3);
+    display: inline-block;
+    font-size: 12pt;
+    letter-spacing: 2px;
+    text-transform: uppercase;
+  }
+
+  /* ── Table of Contents ──────────────────────── */
+  .toc { page-break-after: always; }
+  .toc h2 { margin-bottom: 1em; }
+  .toc ul { list-style: none; }
+  .toc li {
+    padding: 0.3em 0;
+    border-bottom: 1px dotted #ccc;
+  }
+  .toc .section-num { color: #0f3460; font-weight: 600; margin-right: 0.5em; }
+
+  /* ── Headings ───────────────────────────────── */
+  h2 {
+    font-size: 18pt;
+    color: #0f3460;
+    border-bottom: 3px solid #0f3460;
+    padding-bottom: 0.2em;
+    margin: 1.5em 0 0.8em 0;
+  }
+  h3 {
+    font-size: 13pt;
+    color: #16213e;
+    margin: 1.2em 0 0.5em 0;
+  }
+
+  /* ── Summary Box ────────────────────────────── */
+  .summary-box {
+    background: #f8f9fa;
+    border-left: 4px solid #0f3460;
+    padding: 1.2em 1.5em;
+    margin: 1em 0;
+    line-height: 1.8;
+  }
+
+  /* ── Stats Grid ─────────────────────────────── */
+  .stats-grid {
+    display: flex;
+    gap: 1em;
+    margin: 1.5em 0;
+  }
+  .stat-card {
+    flex: 1;
+    text-align: center;
+    padding: 1em;
+    border-radius: 8px;
+    color: white;
+    font-weight: 700;
+  }
+  .stat-card .number { font-size: 28pt; display: block; }
+  .stat-card .label { font-size: 9pt; text-transform: uppercase; letter-spacing: 1px; }
+  .stat-critical { background: #dc3545; }
+  .stat-high { background: #e67e22; }
+  .stat-medium { background: #f39c12; }
+  .stat-low { background: #3498db; }
+  .stat-info { background: #95a5a6; }
+
+  /* ── Severity Bar Chart ─────────────────────── */
+  .severity-bar {
+    display: flex;
+    height: 30px;
+    border-radius: 4px;
+    overflow: hidden;
+    margin: 1em 0;
+  }
+  .severity-bar div {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: white;
+    font-size: 9pt;
+    font-weight: 600;
+  }
+
+  /* ── Tables ─────────────────────────────────── */
+  table {
+    width: 100%;
+    border-collapse: collapse;
+    margin: 1em 0;
+    font-size: 10pt;
+  }
+  th {
+    background: #0f3460;
+    color: white;
+    padding: 0.6em 0.8em;
+    text-align: left;
+    font-weight: 600;
+  }
+  td {
+    padding: 0.5em 0.8em;
+    border-bottom: 1px solid #e0e0e0;
+  }
+  tr:nth-child(even) { background: #f8f9fa; }
+
+  /* ── Finding Cards ──────────────────────────── */
+  .finding {
+    border: 1px solid #ddd;
+    border-radius: 8px;
+    margin: 1.5em 0;
+    overflow: hidden;
+    page-break-inside: avoid;
+  }
+  .finding-header {
+    padding: 0.8em 1.2em;
+    color: white;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+  }
+  .finding-header h3 { color: white; margin: 0; font-size: 12pt; }
+  .finding-header .badge {
+    padding: 0.2em 0.8em;
+    border-radius: 20px;
+    background: rgba(255,255,255,0.25);
+    font-size: 9pt;
+    font-weight: 600;
+  }
+  .sev-critical .finding-header { background: #dc3545; }
+  .sev-high .finding-header { background: #e67e22; }
+  .sev-medium .finding-header { background: #f39c12; }
+  .sev-low .finding-header { background: #3498db; }
+  .sev-info .finding-header { background: #95a5a6; }
+
+  .finding-body { padding: 1.2em; }
+  .finding-body h4 {
+    font-size: 10pt;
+    color: #555;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    margin: 1em 0 0.3em 0;
+  }
+  .finding-body h4:first-child { margin-top: 0; }
+
+  .evidence {
+    background: #1a1a2e;
+    color: #7fdbca;
+    padding: 0.8em 1em;
+    border-radius: 4px;
+    font-family: "Consolas", "Fira Code", monospace;
+    font-size: 9pt;
+    white-space: pre-wrap;
+    word-break: break-all;
+    margin: 0.5em 0;
+    overflow-x: auto;
+  }
+
+  .recommendation {
+    background: #e8f5e9;
+    border-left: 3px solid #4caf50;
+    padding: 0.8em 1em;
+    margin: 0.5em 0;
+    white-space: pre-wrap;
+  }
+
+  .references { font-size: 9pt; color: #666; }
+  .references a { color: #0f3460; }
+
+  .tags { margin-top: 0.5em; }
+  .tag {
+    display: inline-block;
+    background: #e8eaf6;
+    color: #3949ab;
+    padding: 0.1em 0.5em;
+    border-radius: 3px;
+    font-size: 8pt;
+    margin-right: 0.3em;
+  }
+
+  /* ── Host Table ─────────────────────────────── */
+  .host-ports { font-family: monospace; font-size: 9pt; }
+
+  /* ── Disclaimer ─────────────────────────────── */
+  .disclaimer {
+    margin-top: 2em;
+    padding: 1em;
+    background: #fff8e1;
+    border: 1px solid #ffe082;
+    font-size: 9pt;
+    color: #666;
+    page-break-before: always;
+  }
+  .disclaimer h3 { color: #f57f17; font-size: 11pt; }
+</style>
+</head>
+<body>
+
+<!-- ═══════════════════════ COVER PAGE ═══════════════════════ -->
+<div class="cover">
+  <h1>Penetrationstest</h1>
+  <div class="subtitle">{{ project.name }}</div>
+  <div class="meta">
+    <strong>Auftraggeber:</strong> {{ meta.client }}<br>
+    <strong>Ziel:</strong> {{ project.target }}<br>
+    <strong>Zeitraum:</strong> {{ meta.date_range }}<br>
+    <strong>Erstellt:</strong> {{ meta.report_date }}<br>
+    <strong>Autor:</strong> {{ meta.author }}<br>
+    {% if meta.version %}<strong>Version:</strong> {{ meta.version }}<br>{% endif %}
+  </div>
+  <div class="classification">VERTRAULICH</div>
+</div>
+
+<!-- ═══════════════════════ TABLE OF CONTENTS ═══════════════════════ -->
+<div class="toc">
+  <h2>Inhaltsverzeichnis</h2>
+  <ul>
+    <li><span class="section-num">1</span> Management Summary</li>
+    <li><span class="section-num">2</span> Scope & Methodik</li>
+    <li><span class="section-num">3</span> Ergebnisübersicht</li>
+    <li><span class="section-num">4</span> Entdeckte Hosts & Dienste</li>
+    <li><span class="section-num">5</span> Findings im Detail</li>
+    <li><span class="section-num">6</span> Disclaimer & Haftungsausschluss</li>
+  </ul>
+</div>
+
+<!-- ═══════════════════════ MANAGEMENT SUMMARY ═══════════════════════ -->
+<h2>1. Management Summary</h2>
+
+<div class="summary-box">
+  {{ meta.summary | default("Im Rahmen des durchgeführten Penetrationstests wurden die externen Systeme und Webanwendungen des Auftraggebers auf Sicherheitslücken untersucht. Die nachfolgenden Ergebnisse zeigen die identifizierten Schwachstellen, priorisiert nach Schweregrad.", true) }}
+</div>
+
+<div class="stats-grid">
+  <div class="stat-card stat-critical">
+    <span class="number">{{ counts.critical }}</span>
+    <span class="label">Critical</span>
+  </div>
+  <div class="stat-card stat-high">
+    <span class="number">{{ counts.high }}</span>
+    <span class="label">High</span>
+  </div>
+  <div class="stat-card stat-medium">
+    <span class="number">{{ counts.medium }}</span>
+    <span class="label">Medium</span>
+  </div>
+  <div class="stat-card stat-low">
+    <span class="number">{{ counts.low }}</span>
+    <span class="label">Low</span>
+  </div>
+  <div class="stat-card stat-info">
+    <span class="number">{{ counts.info }}</span>
+    <span class="label">Info</span>
+  </div>
+</div>
+
+{% set total = counts.critical + counts.high + counts.medium + counts.low + counts.info %}
+{% if total > 0 %}
+<div class="severity-bar">
+  {% if counts.critical %}<div class="stat-critical" style="flex:{{ counts.critical }}">{{ counts.critical }}</div>{% endif %}
+  {% if counts.high %}<div class="stat-high" style="flex:{{ counts.high }}">{{ counts.high }}</div>{% endif %}
+  {% if counts.medium %}<div class="stat-medium" style="flex:{{ counts.medium }}">{{ counts.medium }}</div>{% endif %}
+  {% if counts.low %}<div class="stat-low" style="flex:{{ counts.low }}">{{ counts.low }}</div>{% endif %}
+  {% if counts.info %}<div class="stat-info" style="flex:{{ counts.info }}">{{ counts.info }}</div>{% endif %}
+</div>
+{% endif %}
+
+<!-- ═══════════════════════ SCOPE & METHODIK ═══════════════════════ -->
+<h2>2. Scope & Methodik</h2>
+
+<h3>2.1 Prüfungsumfang</h3>
+<table>
+  <tr><th>Eigenschaft</th><th>Details</th></tr>
+  <tr><td>Primäres Ziel</td><td>{{ project.target }}</td></tr>
+  <tr><td>Scope</td><td>{{ project.scope | join(", ") }}</td></tr>
+  {% if project.out_of_scope %}
+  <tr><td>Ausgeschlossen</td><td>{{ project.out_of_scope | join(", ") }}</td></tr>
+  {% endif %}
+  <tr><td>Subdomains gefunden</td><td>{{ subdomains | length }}</td></tr>
+  <tr><td>Hosts identifiziert</td><td>{{ hosts | length }}</td></tr>
+</table>
+
+<h3>2.2 Durchgeführte Tests</h3>
+<table>
+  <tr><th>Scanner</th><th>Status</th><th>Dauer</th></tr>
+  {% for result in project.scan_results %}
+  <tr>
+    <td>{{ result.scanner_name }}</td>
+    <td>{{ result.status.value }}</td>
+    <td>{{ result.duration_seconds }}s</td>
+  </tr>
+  {% endfor %}
+</table>
+
+<h3>2.3 Bewertungsmethodik</h3>
+<p>Die Schwachstellen wurden nach dem Common Vulnerability Scoring System (CVSS v3.1) bewertet:</p>
+<table>
+  <tr><th>Schweregrad</th><th>CVSS Score</th><th>Beschreibung</th></tr>
+  <tr><td style="color:#dc3545;font-weight:700">Critical</td><td>9.0 – 10.0</td><td>Sofortige Ausnutzung möglich, maximaler Schaden</td></tr>
+  <tr><td style="color:#e67e22;font-weight:700">High</td><td>7.0 – 8.9</td><td>Signifikantes Risiko, zeitnahe Behebung nötig</td></tr>
+  <tr><td style="color:#f39c12;font-weight:700">Medium</td><td>4.0 – 6.9</td><td>Moderates Risiko, Behebung empfohlen</td></tr>
+  <tr><td style="color:#3498db;font-weight:700">Low</td><td>0.1 – 3.9</td><td>Geringes Risiko, Behebung bei Gelegenheit</td></tr>
+  <tr><td style="color:#95a5a6;font-weight:700">Info</td><td>0.0</td><td>Informativ, kein direktes Sicherheitsrisiko</td></tr>
+</table>
+
+<!-- ═══════════════════════ HOST OVERVIEW ═══════════════════════ -->
+<h2>3. Entdeckte Hosts & Dienste</h2>
+
+{% if hosts %}
+<table>
+  <tr><th>Host</th><th>IP</th><th>Offene Ports</th><th>Web</th><th>Technologien</th></tr>
+  {% for key, host in hosts.items() %}
+  <tr>
+    <td><strong>{{ host.hostname }}</strong></td>
+    <td>{{ host.ip or "-" }}</td>
+    <td class="host-ports">{{ host.ports | map(attribute='port') | join(', ') if host.ports else "-" }}</td>
+    <td>{{ "Ja" if host.is_web else "-" }}</td>
+    <td>{{ host.technologies | join(", ") if host.technologies else "-" }}</td>
+  </tr>
+  {% endfor %}
+</table>
+{% else %}
+<p><em>Keine Hosts im Scan identifiziert.</em></p>
+{% endif %}
+
+{% if subdomains %}
+<h3>3.1 Entdeckte Subdomains ({{ subdomains | length }})</h3>
+<table>
+  <tr><th>#</th><th>Subdomain</th></tr>
+  {% for sub in subdomains %}
+  <tr><td>{{ loop.index }}</td><td>{{ sub }}</td></tr>
+  {% endfor %}
+</table>
+{% endif %}
+
+<!-- ═══════════════════════ FINDINGS ═══════════════════════ -->
+<h2>4. Findings im Detail</h2>
+
+{% if findings %}
+{% for finding in findings %}
+<div class="finding sev-{{ finding.severity.value }}">
+  <div class="finding-header">
+    <h3>{{ loop.index }}. {{ finding.title }}</h3>
+    <span class="badge">{{ finding.severity.value | upper }}</span>
+  </div>
+  <div class="finding-body">
+    <h4>Beschreibung</h4>
+    <p>{{ finding.description }}</p>
+
+    {% if finding.evidence %}
+    <h4>Proof of Concept / Evidence</h4>
+    <div class="evidence">{{ finding.evidence }}</div>
+    {% endif %}
+
+    <h4>Empfehlung</h4>
+    <div class="recommendation">{{ finding.recommendation }}</div>
+
+    {% if finding.references %}
+    <h4>Referenzen</h4>
+    <div class="references">
+      {% for ref in finding.references %}
+      <a href="{{ ref }}">{{ ref }}</a><br>
+      {% endfor %}
+    </div>
+    {% endif %}
+
+    {% if finding.tags %}
+    <div class="tags">
+      {% for tag in finding.tags %}
+      <span class="tag">{{ tag }}</span>
+      {% endfor %}
+    </div>
+    {% endif %}
+  </div>
+</div>
+{% endfor %}
+{% else %}
+<p><em>Keine Schwachstellen identifiziert.</em></p>
+{% endif %}
+
+<!-- ═══════════════════════ DISCLAIMER ═══════════════════════ -->
+<div class="disclaimer">
+  <h3>Disclaimer & Haftungsausschluss</h3>
+  <p>
+    Dieser Bericht wurde nach bestem Wissen und Gewissen erstellt und gibt den
+    Sicherheitszustand zum Zeitpunkt der Prüfung wieder. Die Ergebnisse stellen
+    eine Momentaufnahme dar und erheben keinen Anspruch auf Vollständigkeit.
+  </p>
+  <p>
+    Neue Schwachstellen können jederzeit bekannt werden. Es wird empfohlen,
+    regelmäßige Sicherheitsüberprüfungen durchzuführen und die empfohlenen
+    Maßnahmen zeitnah umzusetzen.
+  </p>
+  <p>
+    Dieser Bericht ist vertraulich und ausschließlich für den Auftraggeber bestimmt.
+    Eine Weitergabe an Dritte bedarf der schriftlichen Genehmigung.
+  </p>
+</div>
+
+</body>
+</html>
