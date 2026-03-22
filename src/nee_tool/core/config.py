@@ -16,6 +16,8 @@ class ToolPaths(BaseModel):
     testssl: str = "testssl.sh"
     nuclei: str = "nuclei"
     feroxbuster: str = "feroxbuster"
+    katana: str = "katana"
+    gospider: str = "gospider"
 
 
 class ScanConfig(BaseModel):
@@ -54,7 +56,10 @@ class PipelineConfig(BaseModel):
         "security_headers",
         "ssl_check",
         "tech_detect",
+        "crawler",
         "nuclei",
+        "dir_bruteforce",
+        "cve_enrichment",
     ])
 
 

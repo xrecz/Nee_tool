@@ -22,30 +22,44 @@ class SSLCheckScanner(BaseScanner):
     required_tools: list[str] = []  # Python fallback available
 
     def scan(self, target: str, previous_results: list[ScanResult]) -> ScanResult:
-        # Find web hosts from previous results
-        web_hosts: set[str] = set()
+        # Find web hosts and their HTTPS ports from previous results
+        host_ports: dict[str, list[int]] = {}
         for prev in previous_results:
             for host in prev.hosts:
                 if host.is_web:
-                    web_hosts.add(host.hostname or host.ip)
+                    hostname = host.hostname or host.ip
+                    ssl_ports = [
+                        p.port for p in host.ports
+                        if p.port in (443, 8443, 8843, 9443) or p.service in ("https", "ssl")
+                    ]
+                    # Default to 443 if no specific HTTPS port found
+                    if not ssl_ports:
+                        ssl_ports = [443]
+                    host_ports[hostname] = ssl_ports
 
-        if not web_hosts:
-            web_hosts = {target}
+        if not host_ports:
+            host_ports = {target: [443]}
 
         all_findings: list[Finding] = []
         all_hosts: list[HostInfo] = []
+        first_host = True
 
-        for host in sorted(web_hosts):
-            if shutil.which(self.config.tools.testssl):
-                host_info, findings = self._run_testssl(host)
-            else:
-                if host == sorted(web_hosts)[0]:
-                    console.print("    [dim]testssl.sh nicht verfügbar, nutze Python-Fallback[/dim]")
-                host_info, findings = self._python_ssl_check(host)
+        for host in sorted(host_ports.keys()):
+            ports = host_ports[host]
+            for port in ports:
+                if shutil.which(self.config.tools.testssl):
+                    # testssl.sh supports host:port syntax
+                    host_port = f"{host}:{port}" if port != 443 else host
+                    host_info, findings = self._run_testssl(host_port)
+                else:
+                    if first_host:
+                        console.print("    [dim]testssl.sh nicht verfügbar, nutze Python-Fallback[/dim]")
+                        first_host = False
+                    host_info, findings = self._python_ssl_check(host, port)
 
-            if host_info:
-                all_hosts.append(host_info)
-            all_findings.extend(findings)
+                if host_info:
+                    all_hosts.append(host_info)
+                all_findings.extend(findings)
 
         return ScanResult(
             scanner_name=self.name,
@@ -86,14 +100,15 @@ class SSLCheckScanner(BaseScanner):
 
         return HostInfo(hostname=host, is_web=True, ssl_info={"checked": True}), findings
 
-    def _python_ssl_check(self, host: str) -> tuple[HostInfo | None, list[Finding]]:
+    def _python_ssl_check(self, host: str, port: int = 443) -> tuple[HostInfo | None, list[Finding]]:
         """Fallback: Basic SSL check with Python ssl module."""
         findings: list[Finding] = []
         ssl_info: dict = {}
+        host_label = f"{host}:{port}" if port != 443 else host
 
         try:
             ctx = ssl.create_default_context()
-            with socket.create_connection((host, 443), timeout=10) as sock:
+            with socket.create_connection((host, port), timeout=10) as sock:
                 with ctx.wrap_socket(sock, server_hostname=host) as ssock:
                     cert = ssock.getpeercert()
                     cipher = ssock.cipher()
@@ -113,18 +128,18 @@ class SSLCheckScanner(BaseScanner):
 
                         if days_left < 0:
                             findings.append(Finding(
-                                title=f"SSL-Zertifikat abgelaufen ({host})",
+                                title=f"SSL-Zertifikat abgelaufen ({host_label})",
                                 severity=Severity.CRITICAL,
-                                description=f"Das Zertifikat für {host} ist seit {abs(days_left)} Tagen abgelaufen.",
+                                description=f"Das Zertifikat für {host_label} ist seit {abs(days_left)} Tagen abgelaufen.",
                                 evidence=f"notAfter: {not_after}",
                                 recommendation="Zertifikat sofort erneuern.",
                                 tags=["ssl", "certificate"],
                             ))
                         elif days_left < 30:
                             findings.append(Finding(
-                                title=f"SSL-Zertifikat läuft bald ab ({host})",
+                                title=f"SSL-Zertifikat läuft bald ab ({host_label})",
                                 severity=Severity.MEDIUM,
-                                description=f"Das Zertifikat für {host} läuft in {days_left} Tagen ab.",
+                                description=f"Das Zertifikat für {host_label} läuft in {days_left} Tagen ab.",
                                 evidence=f"notAfter: {not_after}",
                                 recommendation="Zertifikat zeitnah erneuern.",
                                 tags=["ssl", "certificate"],
@@ -133,9 +148,9 @@ class SSLCheckScanner(BaseScanner):
                     # Check for old TLS versions
                     if protocol and protocol in ("TLSv1", "TLSv1.1"):
                         findings.append(Finding(
-                            title=f"Veraltete TLS-Version ({host})",
+                            title=f"Veraltete TLS-Version ({host_label})",
                             severity=Severity.HIGH,
-                            description=f"{host} verwendet {protocol}, welches als unsicher gilt.",
+                            description=f"{host_label} verwendet {protocol}, welches als unsicher gilt.",
                             evidence=f"Protocol: {protocol}",
                             recommendation="Mindestens TLS 1.2 erzwingen, idealerweise TLS 1.3.",
                             tags=["ssl", "tls-version"],
@@ -149,9 +164,9 @@ class SSLCheckScanner(BaseScanner):
 
         except ssl.SSLCertVerificationError as e:
             findings.append(Finding(
-                title=f"SSL-Zertifikat ungültig ({host})",
+                title=f"SSL-Zertifikat ungültig ({host_label})",
                 severity=Severity.HIGH,
-                description=f"Das Zertifikat für {host} konnte nicht verifiziert werden: {e}",
+                description=f"Das Zertifikat für {host_label} konnte nicht verifiziert werden: {e}",
                 recommendation="Gültiges Zertifikat von einer vertrauenswürdigen CA installieren.",
                 tags=["ssl", "certificate"],
             ))

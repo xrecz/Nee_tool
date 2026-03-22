@@ -2,7 +2,7 @@
 
 Runs nuclei with community and custom templates against discovered
 web targets. Parses JSON output into structured findings with
-severity mapping.
+severity mapping. Auto-updates templates before scanning.
 
 Nuclei template categories used:
 - cves: Known CVE checks
@@ -15,6 +15,7 @@ Nuclei template categories used:
 from __future__ import annotations
 
 import json
+import shutil
 from pathlib import Path
 from tempfile import NamedTemporaryFile
 
@@ -37,7 +38,23 @@ class NucleiScanner(BaseScanner):
     description = "Schwachstellen-Scan (Nuclei CVE/Misconfig/Exposure)"
     required_tools = ["nuclei"]
 
+    def _update_templates(self) -> None:
+        """Auto-update nuclei templates to get latest CVE checks."""
+        nuclei_path = self.config.tools.nuclei
+        if not shutil.which(nuclei_path):
+            return
+
+        console.print("    [dim]Aktualisiere Nuclei-Templates...[/dim]")
+        result = self.run_command([nuclei_path, "-update-templates", "-silent"], timeout=120)
+        if result.returncode == 0:
+            console.print("    [dim]Templates aktuell.[/dim]")
+        else:
+            console.print("    [yellow]Template-Update fehlgeschlagen, nutze vorhandene.[/yellow]")
+
     def scan(self, target: str, previous_results: list[ScanResult]) -> ScanResult:
+        # Update templates before scanning for latest CVEs
+        self._update_templates()
+
         # Collect web targets from previous results
         web_targets: set[str] = set()
         for prev in previous_results:

@@ -23,11 +23,13 @@ src/nee_tool/
 │   ├── subdomain.py          # Subdomain enumeration (subfinder + crt.sh)
 │   ├── portscan.py           # Port scanning (nmap XML parsing)
 │   ├── web_discovery.py      # HTTP/HTTPS probing (httpx + urllib fallback)
-│   ├── security_headers.py   # HTTP security header checks
-│   ├── ssl_check.py          # SSL/TLS analysis (testssl.sh + ssl fallback)
+│   ├── security_headers.py   # HTTP security header checks + value validation
+│   ├── ssl_check.py          # SSL/TLS analysis (testssl.sh + ssl fallback, multi-port)
 │   ├── tech_detect.py        # Technology detection (whatweb + signatures)
-│   ├── nuclei.py             # Vulnerability scanning (nuclei JSONL parsing)
-│   └── dir_bruteforce.py     # Directory/file discovery (feroxbuster/ffuf)
+│   ├── crawler.py            # Web crawling (katana/gospider + Python fallback)
+│   ├── nuclei.py             # Vulnerability scanning (nuclei JSONL, auto-update templates)
+│   ├── dir_bruteforce.py     # Directory/file discovery (feroxbuster/ffuf)
+│   └── cve_enrichment.py     # CVE lookup via NVD/NIST API for detected software
 ├── report/
 │   ├── generator.py          # PDF/HTML report generation (WeasyPrint + Jinja2)
 │   ├── finding_templates.py  # 20 pre-defined finding templates (OWASP)
@@ -53,7 +55,7 @@ src/nee_tool/
 - **Graceful degradation:** Every scanner has a Python fallback when external tools
   (nmap, subfinder, httpx, etc.) are not installed. Never crash on missing tools.
 - **Pipeline chaining:** Scanners receive `previous_results` and build on them.
-  Order matters: subdomain → portscan → web_discovery → headers/ssl/tech → nuclei → dir_bruteforce.
+  Order matters: subdomain → portscan → web_discovery → headers/ssl/tech → crawler → nuclei → dir_bruteforce → cve_enrichment.
 - **Web UI:** FastAPI + HTMX for a lightweight interactive dashboard. No frontend
   framework needed. Templates in `web/templates/`, server-side rendered.
 - **Pydantic models:** All data flows through typed models (`Project`, `ScanResult`,
@@ -107,7 +109,7 @@ nee info <project.json>            # Summarize previous scan
 
 - **Runtime:** rich, typer, pydantic, jinja2, weasyprint
 - **External tools (optional, graceful fallback):** nmap, subfinder, httpx,
-  whatweb, testssl.sh, nuclei, feroxbuster
+  whatweb, testssl.sh, nuclei, feroxbuster, katana, gospider
 - **GoPhish:** Separate server, connected via REST API
 
 ## Testing

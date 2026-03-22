@@ -133,6 +133,9 @@ class SecurityHeadersScanner(BaseScanner):
                     tags=["headers", header_name],
                 ))
 
+        # Validate header VALUES for weak configurations
+        findings.extend(self._validate_header_values(host, header_lower))
+
         # Check for information disclosure headers
         for header_name, info in BAD_HEADERS.items():
             if header_name in header_lower:
@@ -147,6 +150,106 @@ class SecurityHeadersScanner(BaseScanner):
                 ))
 
         return headers, findings
+
+    def _validate_header_values(self, host: str, headers: dict[str, str]) -> list[Finding]:
+        """Validate that present security headers have secure values."""
+        findings: list[Finding] = []
+
+        # HSTS: Check max-age is sufficient (>= 6 months)
+        hsts = headers.get("strict-transport-security", "")
+        if hsts:
+            import re
+            max_age_match = re.search(r'max-age=(\d+)', hsts)
+            if max_age_match:
+                max_age = int(max_age_match.group(1))
+                if max_age < 15768000:  # < 6 months
+                    findings.append(Finding(
+                        title=f"HSTS max-age zu niedrig ({host})",
+                        severity=Severity.MEDIUM,
+                        description=f"HSTS max-age ist {max_age}s ({max_age // 86400} Tage). "
+                                    f"Empfohlen sind mindestens 6 Monate (15768000s).",
+                        evidence=f"Strict-Transport-Security: {hsts}",
+                        recommendation="max-age auf mindestens 15768000 (6 Monate) setzen, "
+                                      "idealerweise 31536000 (1 Jahr).",
+                        tags=["headers", "hsts"],
+                    ))
+            if "includesubdomains" not in hsts.lower():
+                findings.append(Finding(
+                    title=f"HSTS ohne includeSubDomains ({host})",
+                    severity=Severity.LOW,
+                    description="HSTS-Header enthält kein 'includeSubDomains' Direktiv.",
+                    evidence=f"Strict-Transport-Security: {hsts}",
+                    recommendation="'includeSubDomains' zum HSTS-Header hinzufügen.",
+                    tags=["headers", "hsts"],
+                ))
+
+        # CSP: Check for unsafe directives
+        csp = headers.get("content-security-policy", "")
+        if csp:
+            unsafe_directives = []
+            if "'unsafe-inline'" in csp:
+                unsafe_directives.append("unsafe-inline")
+            if "'unsafe-eval'" in csp:
+                unsafe_directives.append("unsafe-eval")
+            if "data:" in csp and "img-src" not in csp.split("data:")[0].split(";")[-1]:
+                # data: in default-src or script-src is risky
+                unsafe_directives.append("data: URI")
+
+            if unsafe_directives:
+                findings.append(Finding(
+                    title=f"CSP enthält unsichere Direktiven ({host})",
+                    severity=Severity.MEDIUM,
+                    description=f"Content-Security-Policy enthält: {', '.join(unsafe_directives)}. "
+                                f"Dies schwächt den XSS-Schutz erheblich.",
+                    evidence=f"Content-Security-Policy: {csp[:300]}",
+                    recommendation="'unsafe-inline' und 'unsafe-eval' durch Nonces oder "
+                                  "Hashes ersetzen. data: URIs einschränken.",
+                    tags=["headers", "csp"],
+                ))
+
+            if "*" in csp.split(";")[0] if ";" in csp else "*" in csp:
+                findings.append(Finding(
+                    title=f"CSP mit Wildcard-Quelle ({host})",
+                    severity=Severity.MEDIUM,
+                    description="CSP enthält Wildcard (*), was den Schutz aushebelt.",
+                    evidence=f"Content-Security-Policy: {csp[:300]}",
+                    recommendation="Wildcard durch explizite Quellen ersetzen.",
+                    tags=["headers", "csp"],
+                ))
+
+        # X-Frame-Options: Validate value
+        xfo = headers.get("x-frame-options", "")
+        if xfo:
+            xfo_upper = xfo.upper().strip()
+            if xfo_upper not in ("DENY", "SAMEORIGIN"):
+                if xfo_upper.startswith("ALLOW-FROM"):
+                    findings.append(Finding(
+                        title=f"X-Frame-Options ALLOW-FROM veraltet ({host})",
+                        severity=Severity.LOW,
+                        description="ALLOW-FROM wird von modernen Browsern nicht unterstützt.",
+                        evidence=f"X-Frame-Options: {xfo}",
+                        recommendation="CSP frame-ancestors Direktiv verwenden statt ALLOW-FROM.",
+                        tags=["headers", "x-frame-options"],
+                    ))
+
+        # Check for Access-Control-Allow-Origin wildcard
+        cors = headers.get("access-control-allow-origin", "")
+        if cors == "*":
+            # Check if credentials are also allowed
+            creds = headers.get("access-control-allow-credentials", "").lower()
+            severity = Severity.HIGH if creds == "true" else Severity.MEDIUM
+            findings.append(Finding(
+                title=f"CORS Wildcard-Origin ({host})",
+                severity=severity,
+                description="Access-Control-Allow-Origin ist auf '*' gesetzt. "
+                           + ("In Kombination mit Allow-Credentials ist dies besonders kritisch." if creds == "true" else ""),
+                evidence=f"Access-Control-Allow-Origin: {cors}"
+                        + (f"\nAccess-Control-Allow-Credentials: {creds}" if creds else ""),
+                recommendation="Explizite Origin-Whitelist statt Wildcard verwenden.",
+                tags=["headers", "cors"],
+            ))
+
+        return findings
 
     def _fetch_headers(self, host: str) -> dict[str, str]:
         """Fetch HTTP headers from a host."""
