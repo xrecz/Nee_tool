@@ -33,7 +33,10 @@ sudo apt install nmap
 go install github.com/projectdiscovery/subfinder/v2/cmd/subfinder@latest
 go install github.com/projectdiscovery/httpx/cmd/httpx@latest
 go install github.com/projectdiscovery/nuclei/v3/cmd/nuclei@latest
+go install github.com/projectdiscovery/katana/cmd/katana@latest
 sudo apt install whatweb testssl.sh feroxbuster
+# Optional: gospider als Alternative zu katana
+go install github.com/jaeles-project/gospider@latest
 ```
 
 ### 1.3 Scope definieren
@@ -55,15 +58,20 @@ Vor jedem Pentest klären:
 nee scan kunde.de --name "Kunde-ABC-Q1-2026"
 ```
 
-Das startet die komplette Pipeline in dieser Reihenfolge:
-1. **Subdomain-Enumeration** — Findet Subdomains (subfinder + crt.sh)
-2. **Port-Scan** — Offene Ports und Services (nmap)
-3. **Web-Discovery** — HTTP/HTTPS Probing (httpx)
-4. **Security-Headers** — Prüft fehlende Sicherheits-Header
-5. **SSL-Check** — Zertifikat- und TLS-Analyse (testssl.sh)
-6. **Tech-Detection** — Erkennt eingesetzte Technologien (whatweb)
-7. **Nuclei** — CVE- und Schwachstellen-Scan
-8. **Dir-Bruteforce** — Versteckte Pfade/Dateien (feroxbuster/ffuf)
+Das startet die komplette Pipeline mit 10 Scannern:
+
+| # | Scanner | Beschreibung |
+|---|---------|-------------|
+| 1 | **Subdomain-Enumeration** | Findet Subdomains (subfinder + crt.sh) |
+| 2 | **Port-Scan** | Offene Ports und Services (nmap) |
+| 3 | **Web-Discovery** | HTTP/HTTPS Probing (httpx) |
+| 4 | **Security-Headers** | Prüft Header-Präsenz UND Werte (HSTS max-age, CSP unsafe-inline, CORS) |
+| 5 | **SSL-Check** | Zertifikat- und TLS-Analyse auf allen erkannten HTTPS-Ports (443, 8443, ...) |
+| 6 | **Tech-Detection** | Erkennt eingesetzte Technologien und Versionen (whatweb) |
+| 7 | **Web-Crawler** | Entdeckt Endpoints, JS-Dateien, Forms, APIs (katana/gospider) |
+| 8 | **Nuclei** | CVE- und Schwachstellen-Scan (Templates werden automatisch aktualisiert) |
+| 9 | **Dir-Bruteforce** | Versteckte Pfade/Dateien (feroxbuster/ffuf) |
+| 10 | **CVE-Enrichment** | Prüft erkannte Software gegen NVD/NIST-Datenbank auf bekannte CVEs |
 
 ### 2.2 Selektiver Scan
 
@@ -71,8 +79,8 @@ Das startet die komplette Pipeline in dieser Reihenfolge:
 # Nur bestimmte Module
 nee scan kunde.de --only subdomain,portscan,web_discovery
 
-# Module überspringen (z.B. Nuclei dauert lang)
-nee scan kunde.de --skip nuclei,dir_bruteforce
+# Module überspringen (z.B. Nuclei + CVE-Enrichment dauern lang)
+nee scan kunde.de --skip nuclei,dir_bruteforce,cve_enrichment
 
 # Weniger Ports = schnellerer Scan
 nee scan kunde.de --top-ports 100
@@ -116,6 +124,16 @@ Nach dem Scan die Findings sichten:
 - **Critical/High:** Sofort verifizieren und dokumentieren
 - **Medium:** Bewerten ob ausnutzbar
 - **Low/Info:** Für den Bericht sammeln, Empfehlungen formulieren
+
+**Hinweis zu CVE-Enrichment:** Der CVE-Enrichment-Scanner liefert
+potenzielle CVEs basierend auf erkannter Software. Diese müssen
+**manuell verifiziert** werden — prüfen ob die exakte Version betroffen ist.
+
+**Hinweis zu Header-Checks:** Security-Header werden jetzt nicht nur auf
+Existenz geprüft, sondern auch auf sichere Werte:
+- HSTS: max-age ausreichend? includeSubDomains gesetzt?
+- CSP: Enthält unsafe-inline/unsafe-eval? Wildcards?
+- CORS: Wildcard-Origin mit Credentials?
 
 ### 4.2 Manuelle Findings ergänzen
 
@@ -297,7 +315,9 @@ nee scan example.com --name "Funktionstest" --skip nuclei --timeout 30
 | Scanner wird übersprungen | `nee scanners` → Externes Tool installieren |
 | PDF-Generierung fehlerhaft | WeasyPrint-Abhängigkeiten prüfen: `apt install libpango-1.0-0 libharfbuzz0b libffi-dev` |
 | GoPhish-Verbindung fehlgeschlagen | API-Key und URL prüfen, GoPhish-Server läuft? |
-| Scan dauert zu lange | `--top-ports 100` oder `--skip nuclei,dir_bruteforce` |
+| Scan dauert zu lange | `--top-ports 100` oder `--skip nuclei,dir_bruteforce,cve_enrichment` |
+| CVE-Enrichment liefert nichts | NVD API benötigt Internet; Rate-Limit: 5 Req/30s ohne API-Key |
+| Crawler findet wenig | katana oder gospider installieren für JS-Crawling |
 | Keine Ergebnisse | Scope/Firewall prüfen, ggf. VPN zum Kunden aktiv? |
 
 ---
@@ -306,7 +326,7 @@ nee scan example.com --name "Funktionstest" --skip nuclei --timeout 30
 
 - [ ] Schriftliche Autorisierung (Scope, Zeitraum, Ansprechpartner)
 - [ ] Nee Tool aktuell und funktionsfähig (`nee scanners`)
-- [ ] Externe Tools installiert (nmap, subfinder, httpx, nuclei, etc.)
+- [ ] Externe Tools installiert (nmap, subfinder, httpx, nuclei, katana, etc.)
 - [ ] GoPhish-Instanz bereit (falls Phishing im Scope)
 - [ ] SMTP-Zugang für Phishing-Kampagne konfiguriert
 - [ ] CSV mit Zieladressen vorbereitet
