@@ -16,9 +16,12 @@ from fastapi.responses import FileResponse, HTMLResponse, RedirectResponse
 from fastapi.staticfiles import StaticFiles
 from jinja2 import Environment, FileSystemLoader
 
+from nee_tool.core.compliance import compliance_summary, map_all_findings
 from nee_tool.core.config import Config
 from nee_tool.core.models import Finding, Project, Severity
 from nee_tool.core.orchestrator import SCANNER_REGISTRY, PipelineOrchestrator
+from nee_tool.core.profiles import SCAN_PROFILES, apply_profile
+from nee_tool.core.retest import compare_projects
 from nee_tool.output.json_export import export_project
 from nee_tool.report.finding_templates import FINDING_TEMPLATES, create_finding_from_template
 from nee_tool.report.generator import generate_html, generate_pdf
@@ -90,7 +93,7 @@ async def dashboard(request: Request):
 async def scan_form(request: Request):
     """Show the scan configuration form."""
     scanners = list(SCANNER_REGISTRY.keys())
-    return _render("scan_form.html", scanners=scanners)
+    return _render("scan_form.html", scanners=scanners, profiles=SCAN_PROFILES)
 
 
 @app.post("/scan/start")
@@ -99,6 +102,7 @@ async def scan_start(
     name: str = Form(""),
     scanners: list[str] = Form(default=[]),
     top_ports: int = Form(1000),
+    profile: str = Form(""),
 ):
     """Start a scan in the background."""
     project_name = name or target.replace(".", "_")
@@ -114,6 +118,8 @@ async def scan_start(
 
     def _run():
         config = Config.default()
+        if profile and profile in SCAN_PROFILES:
+            apply_profile(config, profile)
         config.scan.nmap_top_ports = top_ports
         if scanners:
             config.pipeline.enabled_scanners = scanners
@@ -252,3 +258,49 @@ async def report_form(file: str):
 async def templates_view():
     """View all finding templates."""
     return _render("templates_view.html", templates=FINDING_TEMPLATES)
+
+
+# ── Re-Test Routes ─────────────────────────────────────────
+
+@app.get("/retest", response_class=HTMLResponse)
+async def retest_form():
+    """Show re-test comparison form or results."""
+    projects = _get_projects()
+    return _render("retest.html", projects=projects, result=None)
+
+
+@app.post("/retest", response_class=HTMLResponse)
+async def retest_compare(
+    original: str = Form(...),
+    retest_scan: str = Form(...),
+):
+    """Compare two scans and show re-test results."""
+    orig_project = _load_project(original)
+    retest_project = _load_project(retest_scan)
+
+    if not orig_project or not retest_project:
+        return HTMLResponse("Projekt nicht gefunden", status_code=404)
+
+    result = compare_projects(orig_project, retest_project)
+    projects = _get_projects()
+    return _render("retest.html", projects=projects, result=result)
+
+
+# ── Compliance Routes ──────────────────────────────────────
+
+@app.get("/compliance", response_class=HTMLResponse)
+async def compliance_view(file: str = ""):
+    """Show compliance mapping for a project."""
+    if not file:
+        projects = _get_projects()
+        return _render("compliance.html", projects=projects, summary=None, mappings=None)
+
+    project = _load_project(file)
+    if not project:
+        return HTMLResponse("Projekt nicht gefunden", status_code=404)
+
+    findings = project.all_findings()
+    summary = compliance_summary(findings)
+    mappings = map_all_findings(findings)
+
+    return _render("compliance.html", projects=[], summary=summary, mappings=mappings)

@@ -17,6 +17,18 @@
   </div>
 
   <div class="form-group">
+    <label for="profile">Scan-Profil</label>
+    <select name="profile" id="profile" onchange="applyProfile(this.value)">
+      <option value="">Manuell konfigurieren</option>
+      {% for key, p in profiles.items() %}
+      <option value="{{ key }}" data-ports="{{ p.top_ports }}" data-scanners="{{ p.scanners | join(',') }}">
+        {{ p.name }} — {{ p.description }}
+      </option>
+      {% endfor %}
+    </select>
+  </div>
+
+  <div class="form-group">
     <label>Scanner-Module</label>
     <div class="checkbox-group">
       {% for s in scanners %}
@@ -37,4 +49,18 @@
 
   <button type="submit" class="btn btn-primary" style="margin-top:1rem;">Scan starten</button>
 </form>
+
+<script>
+function applyProfile(value) {
+  if (!value) return;
+  const opt = document.querySelector('#profile option[value="' + value + '"]');
+  if (!opt) return;
+  const ports = opt.dataset.ports;
+  const scanners = opt.dataset.scanners.split(',');
+  document.getElementById('top_ports').value = ports;
+  document.querySelectorAll('input[name="scanners"]').forEach(cb => {
+    cb.checked = scanners.includes(cb.value);
+  });
+}
+</script>
 {% endblock %}

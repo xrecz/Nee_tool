@@ -17,7 +17,10 @@ src/nee_tool/
 ├── core/
 │   ├── config.py             # Configuration (tool paths, scan settings, pipeline)
 │   ├── models.py             # Data models (Project, Finding, HostInfo, etc.)
-│   └── orchestrator.py       # Pipeline runner, scanner registry
+│   ├── orchestrator.py       # Pipeline runner, scanner registry
+│   ├── profiles.py           # Scan profiles (quick/standard/deep/compliance/recon)
+│   ├── retest.py             # Re-test workflow (scan diff, fix tracking)
+│   └── compliance.py         # Compliance mapping (BSI/ISO 27001/DSGVO)
 ├── scanners/
 │   ├── base.py               # BaseScanner ABC (all scanners inherit from this)
 │   ├── subdomain.py          # Subdomain enumeration (subfinder + crt.sh)
@@ -69,6 +72,14 @@ pip install -e .
 
 # Scan pipeline
 nee scan <target> [--name NAME] [--only scanner1,scanner2] [--skip scanner1]
+nee scan <target> --profile quick  # Use scan profile (quick/standard/deep/compliance/recon)
+nee profiles                       # List available scan profiles
+
+# Re-Test (compare two scans)
+nee retest <original.json> <retest.json> [--output retest_result.json]
+
+# Compliance mapping
+nee compliance <project.json>      # Show BSI/ISO 27001/DSGVO mapping
 
 # Reports
 nee report <project.json> --client "Firma" --author "Name"

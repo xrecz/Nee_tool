@@ -73,7 +73,41 @@ Das startet die komplette Pipeline mit 10 Scannern:
 | 9 | **Dir-Bruteforce** | Versteckte Pfade/Dateien (feroxbuster/ffuf) |
 | 10 | **CVE-Enrichment** | Prüft erkannte Software gegen NVD/NIST-Datenbank auf bekannte CVEs |
 
-### 2.2 Selektiver Scan
+### 2.2 Scan-Profile (NEU)
+
+Vorkonfigurierte Presets für verschiedene Szenarien:
+
+```bash
+# Profile anzeigen
+nee profiles
+
+# Quick Scan (~15 Min) — Schnelle Übersicht
+nee scan kunde.de --profile quick
+
+# Standard Pentest (~1-2 Std) — Alle Scanner
+nee scan kunde.de --profile standard
+
+# Deep Scan (~4+ Std) — Maximale Abdeckung, 5000 Ports
+nee scan kunde.de --profile deep
+
+# Compliance Check (~30 Min) — Header, SSL, CVE-Fokus
+nee scan kunde.de --profile compliance
+
+# Recon Only (~20 Min) — Nur Aufklärung, kein aktives Testing
+nee scan kunde.de --profile recon
+```
+
+| Profil | Scanner | Ports | Timeout | Einsatz |
+|--------|---------|-------|---------|---------|
+| `quick` | 5 | 100 | 120s | Ersteinschätzung |
+| `standard` | 10 | 1000 | 600s | Normaler Pentest |
+| `deep` | 10 | 5000 | 1200s | Tiefenanalyse |
+| `compliance` | 6 | 100 | 300s | Konfigurations-Audit |
+| `recon` | 4 | 1000 | 300s | Passive Aufklärung |
+
+Profile können mit `--top-ports`, `--skip`, `--timeout` überschrieben werden.
+
+### 2.3 Selektiver Scan (manuell)
 
 ```bash
 # Nur bestimmte Module
@@ -152,6 +186,21 @@ Im Web-Dashboard unter **Finding hinzufügen**:
 - Template auswählen oder komplett manuell eingeben
 - Severity, Beschreibung, Evidence (PoC), Empfehlung eintragen
 
+### 4.3 Compliance-Mapping anzeigen
+
+Findings automatisch auf Compliance-Frameworks mappen:
+
+```bash
+nee compliance output/kunde_abc_q1_2026/kunde_abc_q1_2026_20260321.json
+```
+
+Zeigt betroffene Controls aus:
+- **BSI IT-Grundschutz** (z.B. CON.1.A6, APP.3.1.A4, ORP.4.A2)
+- **ISO 27001:2022 Annex A** (z.B. A.8.24, A.8.26, A.5.17)
+- **DSGVO Art. 32** (Verschlüsselung, Vertraulichkeit, Integrität)
+
+Auch im **Web-Dashboard** unter dem Menüpunkt **Compliance** verfügbar.
+
 ---
 
 ## 5. Bericht generieren
@@ -191,15 +240,51 @@ nee demo-report --html-only
 
 ---
 
-## 6. Phishing-Kampagne (optional)
+## 6. Re-Test Workflow (NEU)
 
-### 6.1 Voraussetzung
+Nach der Behebung von Schwachstellen durch den Kunden: Re-Test durchführen
+und automatisch vergleichen.
+
+### 6.1 Re-Test-Scan durchführen
+
+```bash
+# Gleicher Scope, neuer Scan
+nee scan kunde.de --name "Kunde-ABC-Retest" --profile standard
+```
+
+### 6.2 Scans vergleichen
+
+```bash
+nee retest \
+    output/kunde_abc_q1_2026/kunde_abc_q1_2026_20260321.json \
+    output/kunde_abc_retest/kunde_abc_retest_20260415.json \
+    --output output/retest_ergebnis.json
+```
+
+Die Ausgabe zeigt:
+- **Behoben:** Findings die im Re-Test nicht mehr auftreten
+- **Offen:** Findings die weiterhin vorhanden sind
+- **Neu:** Zusätzlich entdeckte Schwachstellen
+- **Fix-Rate:** Prozentsatz behobener Findings
+
+### 6.3 Re-Test im Dashboard
+
+Im Web-Dashboard unter **Re-Test**:
+1. Original-Scan und Re-Test-Scan aus Dropdown wählen
+2. **Vergleichen** klicken
+3. Visuelle Übersicht mit Stat-Cards und Finding-Listen
+
+---
+
+## 7. Phishing-Kampagne (optional)
+
+### 7.1 Voraussetzung
 
 - Laufende [GoPhish](https://getgophish.com/)-Instanz
 - API-Key aus GoPhish Admin-Panel
 - CSV-Datei mit Ziel-Adressen
 
-### 6.2 CSV-Format
+### 7.2 CSV-Format
 
 ```csv
 email,first_name,last_name,position
@@ -207,7 +292,7 @@ max.mustermann@kunde.de,Max,Mustermann,IT-Leiter
 anna.schmidt@kunde.de,Anna,Schmidt,Buchhaltung
 ```
 
-### 6.3 Kampagne starten
+### 7.3 Kampagne starten
 
 ```bash
 # Verfügbare E-Mail-Templates
@@ -228,7 +313,7 @@ nee phish setup \
     --url "https://phish.example.de"
 ```
 
-### 6.4 Status & Bericht
+### 7.4 Status & Bericht
 
 ```bash
 # Live-Status prüfen
@@ -243,7 +328,7 @@ nee phish demo-report
 
 ---
 
-## 7. Typischer Pentest-Workflow
+## 8. Typischer Pentest-Workflow
 
 ### Kurzübersicht: Ablauf eines Auftrags
 
@@ -254,7 +339,7 @@ nee phish demo-report
 │     • Nee Tool + externe Tools prüfen           │
 ├─────────────────────────────────────────────────┤
 │  2. AUTOMATISIERTER SCAN                        │
-│     • nee scan target.de --name "Projekt"       │
+│     • nee scan target.de --profile standard     │
 │     • Ergebnisse im Dashboard sichten           │
 ├─────────────────────────────────────────────────┤
 │  3. MANUELLE VERIFIKATION                       │
@@ -266,21 +351,29 @@ nee phish demo-report
 │     • GoPhish-Kampagne aufsetzen                │
 │     • Ergebnisse auswerten                      │
 ├─────────────────────────────────────────────────┤
-│  5. BERICHT                                     │
+│  5. COMPLIANCE-MAPPING                          │
+│     • nee compliance project.json               │
+│     • BSI/ISO 27001/DSGVO Controls zuordnen     │
+├─────────────────────────────────────────────────┤
+│  6. BERICHT                                     │
 │     • nee report ... → PDF generieren           │
 │     • Manuelle Findings + Empfehlungen ergänzen │
 │     • QA: Bericht gegenlesen                    │
 ├─────────────────────────────────────────────────┤
-│  6. ABGABE                                      │
+│  7. ABGABE                                      │
 │     • Bericht an Kunden übergeben               │
 │     • Findings-Besprechung / Präsentation       │
-│     • Re-Test nach Behebung (optional)          │
+├─────────────────────────────────────────────────┤
+│  8. RE-TEST (nach Behebung durch Kunden)        │
+│     • nee scan target.de --profile standard     │
+│     • nee retest original.json retest.json      │
+│     • Fix-Rate dokumentieren                    │
 └─────────────────────────────────────────────────┘
 ```
 
 ---
 
-## 8. Schnelltest (Funktionsprüfung)
+## 9. Schnelltest (Funktionsprüfung)
 
 Um zu prüfen ob alles funktioniert, ohne ein echtes Ziel zu scannen:
 
@@ -307,7 +400,7 @@ nee scan example.com --name "Funktionstest" --skip nuclei --timeout 30
 
 ---
 
-## 9. Troubleshooting
+## 10. Troubleshooting
 
 | Problem | Lösung |
 |---------|--------|
@@ -322,7 +415,7 @@ nee scan example.com --name "Funktionstest" --skip nuclei --timeout 30
 
 ---
 
-## 10. Checkliste vor Kundenauftrag
+## 11. Checkliste vor Kundenauftrag
 
 - [ ] Schriftliche Autorisierung (Scope, Zeitraum, Ansprechpartner)
 - [ ] Nee Tool aktuell und funktionsfähig (`nee scanners`)

@@ -40,14 +40,33 @@ def scan(
     only: str = typer.Option("", "--only", help="Comma-separated list of scanners to run"),
     skip: str = typer.Option("", "--skip", help="Comma-separated list of scanners to skip"),
     timeout: int = typer.Option(600, "--timeout", help="Timeout per scanner in seconds"),
+    profile: str = typer.Option("", "--profile", "-p", help="Scan profile (quick/standard/deep/compliance/recon)"),
 ) -> None:
     """Run the full recon pipeline against a target domain."""
     project_name = name or target.replace(".", "_")
 
     config = Config.default()
     config.output_dir = output
-    config.scan.nmap_top_ports = top_ports
-    config.scan.timeout_per_scanner = timeout
+
+    # Apply profile first (if specified), then overrides
+    if profile:
+        from nee_tool.core.profiles import SCAN_PROFILES, apply_profile
+        try:
+            apply_profile(config, profile)
+            console.print(f"[bold]Profil:[/bold] {SCAN_PROFILES[profile].name} — {SCAN_PROFILES[profile].description}")
+        except KeyError as e:
+            console.print(f"[red]{e}[/red]")
+            raise typer.Exit(1)
+
+    # CLI overrides take precedence over profile
+    if top_ports != 1000:
+        config.scan.nmap_top_ports = top_ports
+    elif not profile:
+        config.scan.nmap_top_ports = top_ports
+    if timeout != 600:
+        config.scan.timeout_per_scanner = timeout
+    elif not profile:
+        config.scan.timeout_per_scanner = timeout
 
     if only:
         config.pipeline.enabled_scanners = [s.strip() for s in only.split(",")]
@@ -217,6 +236,146 @@ def templates() -> None:
     console.print(table)
     console.print(f"\n[bold]{len(FINDING_TEMPLATES)}[/bold] Templates verfügbar")
     console.print("[dim]Nutzung: Aus Pipeline-Findings wird automatisch der passende Template-Text ergänzt.[/dim]")
+
+
+@app.command()
+def profiles() -> None:
+    """List all available scan profiles."""
+    from rich.table import Table
+
+    from nee_tool.core.profiles import SCAN_PROFILES
+
+    table = Table(title="Scan-Profile", show_header=True)
+    table.add_column("Key", style="cyan")
+    table.add_column("Name")
+    table.add_column("Beschreibung", max_width=50)
+    table.add_column("Scanner", justify="right")
+    table.add_column("Ports", justify="right")
+
+    for key, p in SCAN_PROFILES.items():
+        table.add_row(key, p.name, p.description, str(len(p.scanners)), str(p.top_ports))
+
+    console.print(table)
+    console.print("\n[dim]Nutzung: nee scan target.de --profile quick[/dim]")
+
+
+@app.command()
+def retest(
+    original_file: str = typer.Argument(help="Path to original scan project JSON"),
+    retest_file: str = typer.Argument(help="Path to re-test scan project JSON"),
+    output: str = typer.Option("", "--output", "-o", help="Output JSON path for re-test results"),
+) -> None:
+    """Compare two scans to identify fixed, persistent, and new findings."""
+    import json as json_mod
+
+    from rich.table import Table
+
+    from nee_tool.core.models import Project
+    from nee_tool.core.retest import compare_projects
+
+    orig_path = Path(original_file)
+    retest_path = Path(retest_file)
+
+    for p in (orig_path, retest_path):
+        if not p.exists():
+            console.print(f"[red]Datei nicht gefunden: {p}[/red]")
+            raise typer.Exit(1)
+
+    original = Project(**json_mod.loads(orig_path.read_text()))
+    retest_proj = Project(**json_mod.loads(retest_path.read_text()))
+
+    result = compare_projects(original, retest_proj)
+    counts = result.summary_counts()
+
+    console.print(f"\n[bold]Re-Test Vergleich[/bold]")
+    console.print(f"  Original:  {result.original_project} ({result.original_date})")
+    console.print(f"  Re-Test:   {result.retest_project} ({result.retest_date})")
+    console.print()
+
+    # Summary table
+    table = Table(title="Ergebnis", show_header=True)
+    table.add_column("Status")
+    table.add_column("Anzahl", justify="right")
+
+    table.add_row("[green]Behoben[/green]", f"[green]{counts['fixed']}[/green]")
+    table.add_row("[red]Offen[/red]", f"[red]{counts['persistent']}[/red]")
+    table.add_row("[yellow]Neu[/yellow]", f"[yellow]{counts['new']}[/yellow]")
+    table.add_row("[bold]Fix-Rate[/bold]", f"[bold]{result.fix_rate}%[/bold]")
+    console.print(table)
+
+    # Detail tables
+    if result.fixed:
+        console.print("\n[bold green]Behoben:[/bold green]")
+        for rf in result.fixed:
+            console.print(f"  [green]✓[/green] [{rf.finding.severity.value.upper():8}] {rf.finding.title}")
+
+    if result.persistent:
+        console.print("\n[bold red]Noch offen:[/bold red]")
+        for rf in result.persistent:
+            console.print(f"  [red]✗[/red] [{rf.finding.severity.value.upper():8}] {rf.finding.title}")
+
+    if result.new:
+        console.print("\n[bold yellow]Neu gefunden:[/bold yellow]")
+        for rf in result.new:
+            console.print(f"  [yellow]●[/yellow] [{rf.finding.severity.value.upper():8}] {rf.finding.title}")
+
+    # Export if requested
+    if output:
+        out_path = Path(output)
+        out_path.parent.mkdir(parents=True, exist_ok=True)
+        out_path.write_text(json_mod.dumps(result.model_dump(mode="json"), indent=2, ensure_ascii=False, default=str))
+        console.print(f"\n[bold green]Re-Test-Ergebnis gespeichert:[/bold green] {out_path}")
+
+
+@app.command()
+def compliance(
+    project_file: str = typer.Argument(help="Path to a project JSON file"),
+) -> None:
+    """Show compliance mapping for findings (BSI/ISO 27001/DSGVO)."""
+    import json as json_mod
+
+    from rich.table import Table
+
+    from nee_tool.core.compliance import compliance_summary, map_all_findings
+    from nee_tool.core.models import Project
+
+    path = Path(project_file)
+    if not path.exists():
+        console.print(f"[red]Datei nicht gefunden: {path}[/red]")
+        raise typer.Exit(1)
+
+    project = Project(**json_mod.loads(path.read_text()))
+    findings = project.all_findings()
+
+    if not findings:
+        console.print("[yellow]Keine Findings vorhanden.[/yellow]")
+        raise typer.Exit(0)
+
+    # Per-framework summary
+    summary = compliance_summary(findings)
+
+    for framework, controls in summary.items():
+        console.print(f"\n[bold]{framework}[/bold] — {len(controls)} betroffene Controls:")
+        for ctrl in controls:
+            console.print(f"  [cyan]{ctrl}[/cyan]")
+
+    # Detailed mapping table
+    mappings = map_all_findings(findings)
+    console.print()
+
+    table = Table(title=f"Compliance-Mapping ({len(mappings)} Findings)", show_header=True)
+    table.add_column("Finding", max_width=40)
+    table.add_column("BSI", max_width=25)
+    table.add_column("ISO 27001", max_width=25)
+    table.add_column("DSGVO", max_width=25)
+
+    for mapping in mappings:
+        bsi = ", ".join(c.control_id for c in mapping.controls if c.framework == "BSI") or "-"
+        iso = ", ".join(c.control_id for c in mapping.controls if c.framework == "ISO27001") or "-"
+        dsgvo = ", ".join(c.control_id for c in mapping.controls if c.framework == "DSGVO") or "-"
+        table.add_row(mapping.finding_title[:40], bsi, iso, dsgvo)
+
+    console.print(table)
 
 
 @app.command()

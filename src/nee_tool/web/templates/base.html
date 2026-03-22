@@ -135,6 +135,8 @@
     <nav>
       <a href="/" {% if active == "dashboard" %}class="active"{% endif %}>&#9632; Dashboard</a>
       <a href="/scan" {% if active == "scan" %}class="active"{% endif %}>&#9654; Neuer Scan</a>
+      <a href="/retest" {% if active == "retest" %}class="active"{% endif %}>&#8644; Re-Test</a>
+      <a href="/compliance" {% if active == "compliance" %}class="active"{% endif %}>&#9745; Compliance</a>
       <a href="/templates" {% if active == "templates" %}class="active"{% endif %}>&#9830; Templates</a>
     </nav>
   </aside>

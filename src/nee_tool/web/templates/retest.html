@@ -1,0 +1,105 @@
+{% extends "base.html" %}
+{% set active = "retest" %}
+{% block title %}Re-Test — Nee Tool{% endblock %}
+
+{% block content %}
+<h1>Re-Test Vergleich</h1>
+
+{% if result %}
+<div class="grid grid-4" style="margin-bottom:2rem;">
+  <div class="stat stat-low">
+    <span class="number">{{ result.fixed | length }}</span>
+    <span class="label">Behoben</span>
+  </div>
+  <div class="stat stat-critical">
+    <span class="number">{{ result.persistent | length }}</span>
+    <span class="label">Offen</span>
+  </div>
+  <div class="stat stat-medium">
+    <span class="number">{{ result.new | length }}</span>
+    <span class="label">Neu</span>
+  </div>
+  <div class="stat stat-info">
+    <span class="number">{{ result.fix_rate }}%</span>
+    <span class="label">Fix-Rate</span>
+  </div>
+</div>
+
+<div class="card" style="margin-bottom:1rem;">
+  <p><strong>Original:</strong> {{ result.original_project }} ({{ result.original_date }})</p>
+  <p><strong>Re-Test:</strong> {{ result.retest_project }} ({{ result.retest_date }})</p>
+</div>
+
+{% if result.fixed %}
+<h2 style="color: var(--green);">Behoben ({{ result.fixed | length }})</h2>
+<div class="card">
+  {% for rf in result.fixed %}
+  <div class="finding finding-low" style="border-color: var(--green);">
+    <div class="title">
+      <span class="badge badge-success">BEHOBEN</span>
+      <span class="badge badge-{{ rf.finding.severity.value }}">{{ rf.finding.severity.value | upper }}</span>
+      {{ rf.finding.title }}
+    </div>
+  </div>
+  {% endfor %}
+</div>
+{% endif %}
+
+{% if result.persistent %}
+<h2 style="color: var(--red);">Noch offen ({{ result.persistent | length }})</h2>
+<div class="card">
+  {% for rf in result.persistent %}
+  <div class="finding finding-{{ rf.finding.severity.value }}">
+    <div class="title">
+      <span class="badge badge-critical">OFFEN</span>
+      <span class="badge badge-{{ rf.finding.severity.value }}">{{ rf.finding.severity.value | upper }}</span>
+      {{ rf.finding.title }}
+    </div>
+  </div>
+  {% endfor %}
+</div>
+{% endif %}
+
+{% if result.new %}
+<h2 style="color: var(--yellow);">Neu gefunden ({{ result.new | length }})</h2>
+<div class="card">
+  {% for rf in result.new %}
+  <div class="finding finding-{{ rf.finding.severity.value }}">
+    <div class="title">
+      <span class="badge badge-warning">NEU</span>
+      <span class="badge badge-{{ rf.finding.severity.value }}">{{ rf.finding.severity.value | upper }}</span>
+      {{ rf.finding.title }}
+    </div>
+  </div>
+  {% endfor %}
+</div>
+{% endif %}
+
+{% else %}
+<form action="/retest" method="POST" class="card" style="max-width:700px;">
+  <p style="margin-bottom:1rem;">Wähle den Original-Scan und den Re-Test-Scan zum Vergleichen:</p>
+
+  <div class="form-group">
+    <label for="original">Original-Scan</label>
+    <select name="original" id="original" required>
+      <option value="">— Scan wählen —</option>
+      {% for p in projects %}
+      <option value="{{ p.file }}">{{ p.name }} ({{ p.created }}) — {{ p.findings }} Findings</option>
+      {% endfor %}
+    </select>
+  </div>
+
+  <div class="form-group">
+    <label for="retest_scan">Re-Test-Scan</label>
+    <select name="retest_scan" id="retest_scan" required>
+      <option value="">— Scan wählen —</option>
+      {% for p in projects %}
+      <option value="{{ p.file }}">{{ p.name }} ({{ p.created }}) — {{ p.findings }} Findings</option>
+      {% endfor %}
+    </select>
+  </div>
+
+  <button type="submit" class="btn btn-primary">Vergleichen</button>
+</form>
+{% endif %}
+{% endblock %}
