@@ -1,28 +1,30 @@
 {% extends "base.html" %}
 {% set active = "dashboard" %}
-{% block title %}Finding hinzufügen — Nee Tool{% endblock %}
+{% block title %}Finding hinzufügen — TerraRecon{% endblock %}
 
 {% block content %}
-<h1>Finding hinzufügen</h1>
+<div class="toolbar">
+  <h1>+ Finding hinzufügen</h1>
+</div>
 
-<form action="/project/add-finding" method="POST" style="max-width:700px;">
+<form action="/project/add-finding" method="POST" style="max-width:720px;">
   <input type="hidden" name="file" value="{{ file }}">
 
   <div class="card">
-    <h3>Aus Template erstellen (optional)</h3>
-    <div class="form-group">
+    <h3 style="margin-top:0;">Aus Template erstellen (optional)</h3>
+    <div class="form-group" style="margin-bottom:0;">
       <label for="template_key">Finding-Template</label>
       <select name="template_key" id="template_key" onchange="toggleManual(this)">
         <option value="">— Kein Template (manuell) —</option>
         {% for key, tpl in templates.items() %}
-        <option value="{{ key }}">{{ tpl.severity.value | upper }} | {{ tpl.title }}</option>
+        <option value="{{ key }}">{{ tpl.severity.value | upper }} │ {{ tpl.title }}</option>
         {% endfor %}
       </select>
     </div>
   </div>
 
   <div class="card" id="manual-fields">
-    <h3>Finding-Details</h3>
+    <h3 style="margin-top:0;">Finding-Details</h3>
 
     <div class="form-group">
       <label for="title">Titel *</label>
@@ -45,27 +47,27 @@
       <textarea name="description" id="description" rows="4" placeholder="Was wurde gefunden?"></textarea>
     </div>
 
-    <div class="form-group">
+    <div class="form-group" style="margin-bottom:0;">
       <label for="recommendation">Empfehlung</label>
       <textarea name="recommendation" id="recommendation" rows="3" placeholder="Was soll der Kunde tun?"></textarea>
     </div>
   </div>
 
   <div class="card">
-    <h3>Target & Evidence</h3>
+    <h3 style="margin-top:0;">Target & Evidence</h3>
 
     <div class="form-group">
       <label for="target_host">Betroffener Host / URL</label>
       <input type="text" name="target_host" id="target_host" placeholder="z.B. app.example.de/login">
     </div>
 
-    <div class="form-group">
+    <div class="form-group" style="margin-bottom:0;">
       <label for="evidence">Proof of Concept / Evidence</label>
-      <textarea name="evidence" id="evidence" rows="5" placeholder="HTTP Request/Response, Screenshot-Beschreibung, etc." style="font-family:monospace;font-size:0.85rem;"></textarea>
+      <textarea name="evidence" id="evidence" rows="5" placeholder="HTTP Request/Response, Screenshot-Beschreibung, etc." class="mono" style="font-size:0.82rem;"></textarea>
     </div>
   </div>
 
-  <div style="display:flex;gap:0.5rem;margin-top:1rem;">
+  <div class="flex gap-sm mt-2">
     <button type="submit" class="btn btn-primary">Finding speichern</button>
     <a href="/project?file={{ file }}" class="btn">Abbrechen</a>
   </div>
@@ -75,7 +77,7 @@
 function toggleManual(sel) {
   const fields = document.getElementById('manual-fields');
   fields.style.opacity = sel.value ? '0.4' : '1';
-  // If template selected, title/description are optional (filled from template)
+  fields.style.pointerEvents = sel.value ? 'none' : 'auto';
   document.getElementById('title').required = !sel.value;
 }
 </script>

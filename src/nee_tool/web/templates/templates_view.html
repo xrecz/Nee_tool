@@ -1,15 +1,21 @@
 {% extends "base.html" %}
 {% set active = "templates" %}
-{% block title %}Finding-Templates — Nee Tool{% endblock %}
+{% block title %}Finding-Templates — TerraRecon{% endblock %}
 
 {% block content %}
-<h1>Finding-Templates ({{ templates | length }})</h1>
-<p style="color:var(--fg2);margin-bottom:1.5rem;">Vordefinierte Schwachstellen-Beschreibungen mit Empfehlungen. Wähle ein Template beim Hinzufügen eines Findings.</p>
+<div class="toolbar">
+  <h1>◈ Finding-Templates ({{ templates | length }})</h1>
+</div>
+
+<p class="text-muted mb-3">Vordefinierte Schwachstellen-Beschreibungen mit Empfehlungen. Wähle ein Template beim Hinzufügen eines Findings.</p>
 
 {% for key, f in templates.items() %}
 <div class="finding finding-{{ f.severity.value }}">
-  <div style="display:flex;justify-content:space-between;align-items:center;">
-    <div class="title">{{ f.title }} <span style="color:var(--fg2);font-weight:400;font-size:0.8rem;">{{ key }}</span></div>
+  <div class="flex-between">
+    <div class="title">
+      {{ f.title }}
+      <span class="tag" style="margin-left:0.4rem;">{{ key }}</span>
+    </div>
     <span class="badge badge-{{ f.severity.value }}">{{ f.severity.value | upper }}</span>
   </div>
   <div class="desc">{{ f.description[:200] }}{% if f.description | length > 200 %}...{% endif %}</div>
@@ -21,4 +27,11 @@
   {% endif %}
 </div>
 {% endfor %}
+
+{% if not templates %}
+<div class="card empty">
+  <div class="icon">◈</div>
+  <p>Keine Templates vorhanden.</p>
+</div>
+{% endif %}
 {% endblock %}

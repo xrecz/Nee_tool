@@ -1,15 +1,15 @@
 {% extends "base.html" %}
 {% set active = "phishing" %}
-{% block title %}Phishing — Nee Tool{% endblock %}
+{% block title %}Phishing — TerraRecon{% endblock %}
 
 {% block content %}
 <div class="toolbar">
-  <h1>&#127907; GoPhish Integration</h1>
+  <h1>⚡ GoPhish Integration</h1>
 </div>
 
 <!-- Connection form -->
-<div class="card" style="max-width:700px; margin-bottom:1.5rem;">
-  <h2 style="margin-top:0;">GoPhish Verbindung</h2>
+<div class="card" style="max-width:720px; margin-bottom:1.5rem;">
+  <h3 style="margin-top:0;">GoPhish Verbindung</h3>
   <form id="connect-form" onsubmit="connectGophish(event)">
     <div class="grid grid-2">
       <div class="form-group">
@@ -23,17 +23,17 @@
     </div>
     <div id="connect-status" style="margin-bottom:0.8rem;"></div>
     <button type="submit" class="btn btn-primary" id="connect-btn">
-      <span id="connect-spinner" style="display:none;">&#9696; </span>
-      Verbinden &amp; testen
+      <span id="connect-spinner" style="display:none;">⟳ </span>
+      Verbinden & testen
     </button>
   </form>
 </div>
 
-<!-- Campaigns section — visible after connecting -->
+<!-- Campaigns section -->
 <div id="campaigns-section" style="display:none;">
-  <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:1rem;">
+  <div class="flex-between mb-2">
     <h2 style="margin:0;">Kampagnen</h2>
-    <button class="btn btn-primary" onclick="loadCampaigns()">&#8635; Aktualisieren</button>
+    <button class="btn" onclick="loadCampaigns()">⟳ Aktualisieren</button>
   </div>
   <div id="campaigns-list">
     <div class="card empty"><p>Lade Kampagnen...</p></div>
@@ -42,18 +42,18 @@
 
 <!-- Resources section -->
 <div id="resources-section" style="display:none;">
-  <div class="grid grid-3" style="margin-top:1.5rem;">
+  <div class="grid grid-3 mt-3">
     <div class="card">
-      <h3 style="margin:0 0 0.5rem;">E-Mail-Templates</h3>
-      <div id="templates-list"><span style="color:var(--fg2);">Lade...</span></div>
+      <h3 style="margin:0 0 0.75rem;">E-Mail-Templates</h3>
+      <div id="templates-list"><span class="text-muted">Lade...</span></div>
     </div>
     <div class="card">
-      <h3 style="margin:0 0 0.5rem;">Gruppen</h3>
-      <div id="groups-list"><span style="color:var(--fg2);">Lade...</span></div>
+      <h3 style="margin:0 0 0.75rem;">Gruppen</h3>
+      <div id="groups-list"><span class="text-muted">Lade...</span></div>
     </div>
     <div class="card">
-      <h3 style="margin:0 0 0.5rem;">Landing Pages</h3>
-      <div id="pages-list"><span style="color:var(--fg2);">Lade...</span></div>
+      <h3 style="margin:0 0 0.75rem;">Landing Pages</h3>
+      <div id="pages-list"><span class="text-muted">Lade...</span></div>
     </div>
   </div>
 </div>
@@ -84,18 +84,18 @@ function connectGophish(e) {
   .then(data => {
     setLoading(false);
     if (data.ok) {
-      showStatus('connect-status', 'success', '&#10003; Verbunden! GoPhish erreichbar.');
+      showStatus('connect-status', 'success', '✓ Verbunden! GoPhish erreichbar.');
       document.getElementById('campaigns-section').style.display = 'block';
       document.getElementById('resources-section').style.display = 'block';
       loadCampaigns();
       loadResources();
     } else {
-      showStatus('connect-status', 'error', '&#10007; Fehler: ' + (data.error || 'Unbekannter Fehler'));
+      showStatus('connect-status', 'error', '✕ Fehler: ' + (data.error || 'Unbekannter Fehler'));
     }
   })
   .catch(err => {
     setLoading(false);
-    showStatus('connect-status', 'error', '&#10007; Verbindungsfehler: ' + err.message);
+    showStatus('connect-status', 'error', '✕ Verbindungsfehler: ' + err.message);
   });
 }
 
@@ -113,14 +113,14 @@ function loadCampaigns() {
       document.getElementById('campaigns-list').innerHTML = '<div class="card empty"><p>Keine Kampagnen vorhanden. Erstelle eine direkt in GoPhish.</p></div>';
       return;
     }
-    let html = '<div class="card"><table><thead><tr><th>Name</th><th>Status</th><th>Erstellt</th><th>Ziele</th><th>Gesendet</th><th>Geöffnet</th><th>Geklickt</th><th>Credentials</th></tr></thead><tbody>';
+    let html = '<div class="card"><div class="table-wrapper"><table><thead><tr><th>Name</th><th>Status</th><th>Erstellt</th><th>Ziele</th><th>Gesendet</th><th>Geöffnet</th><th>Geklickt</th><th>Credentials</th></tr></thead><tbody>';
     for (const c of campaigns) {
       const stats = c.stats || {};
       const statusBadge = statusClass(c.status);
       html += `<tr>
         <td><strong>${esc(c.name)}</strong></td>
         <td><span class="badge ${statusBadge}">${esc(c.status)}</span></td>
-        <td style="color:var(--fg2);font-size:0.85rem;">${(c.created_date || '').substring(0,10)}</td>
+        <td style="color:var(--fg-secondary);font-size:0.82rem;">${(c.created_date || '').substring(0,10)}</td>
         <td>${stats.total || 0}</td>
         <td>${stats.sent || 0}</td>
         <td>${stats.opened || 0}</td>
@@ -128,7 +128,7 @@ function loadCampaigns() {
         <td>${stats.submitted_data || 0}</td>
       </tr>`;
     }
-    html += '</tbody></table></div>';
+    html += '</tbody></table></div></div>';
     document.getElementById('campaigns-list').innerHTML = html;
   })
   .catch(err => {
@@ -137,34 +137,31 @@ function loadCampaigns() {
 }
 
 function loadResources() {
-  // Templates
   fetch(`/api/phishing/templates?host=${encodeURIComponent(_gpHost)}&api_key=${encodeURIComponent(_gpKey)}`)
   .then(r => r.json())
   .then(data => {
     const items = data.items || [];
     document.getElementById('templates-list').innerHTML = items.length
-      ? items.map(t => `<div style="padding:0.3rem 0; border-bottom:1px solid var(--border); font-size:0.85rem;">${esc(t.name)}</div>`).join('')
-      : '<span style="color:var(--fg2);">Keine Templates</span>';
+      ? items.map(t => `<div style="padding:0.4rem 0; border-bottom:1px solid var(--border); font-size:0.85rem;">${esc(t.name)}</div>`).join('')
+      : '<span class="text-muted">Keine Templates</span>';
   }).catch(() => { document.getElementById('templates-list').innerHTML = '<span style="color:var(--red);">Fehler</span>'; });
 
-  // Groups
   fetch(`/api/phishing/groups?host=${encodeURIComponent(_gpHost)}&api_key=${encodeURIComponent(_gpKey)}`)
   .then(r => r.json())
   .then(data => {
     const items = data.items || [];
     document.getElementById('groups-list').innerHTML = items.length
-      ? items.map(g => `<div style="padding:0.3rem 0; border-bottom:1px solid var(--border); font-size:0.85rem;">${esc(g.name)} <span style="color:var(--fg2);">(${(g.targets||[]).length} Ziele)</span></div>`).join('')
-      : '<span style="color:var(--fg2);">Keine Gruppen</span>';
+      ? items.map(g => `<div style="padding:0.4rem 0; border-bottom:1px solid var(--border); font-size:0.85rem;">${esc(g.name)} <span class="text-muted">(${(g.targets||[]).length} Ziele)</span></div>`).join('')
+      : '<span class="text-muted">Keine Gruppen</span>';
   }).catch(() => { document.getElementById('groups-list').innerHTML = '<span style="color:var(--red);">Fehler</span>'; });
 
-  // Pages
   fetch(`/api/phishing/pages?host=${encodeURIComponent(_gpHost)}&api_key=${encodeURIComponent(_gpKey)}`)
   .then(r => r.json())
   .then(data => {
     const items = data.items || [];
     document.getElementById('pages-list').innerHTML = items.length
-      ? items.map(p => `<div style="padding:0.3rem 0; border-bottom:1px solid var(--border); font-size:0.85rem;">${esc(p.name)}</div>`).join('')
-      : '<span style="color:var(--fg2);">Keine Pages</span>';
+      ? items.map(p => `<div style="padding:0.4rem 0; border-bottom:1px solid var(--border); font-size:0.85rem;">${esc(p.name)}</div>`).join('')
+      : '<span class="text-muted">Keine Pages</span>';
   }).catch(() => { document.getElementById('pages-list').innerHTML = '<span style="color:var(--red);">Fehler</span>'; });
 }
 
@@ -180,7 +177,7 @@ function statusClass(s) {
 function showStatus(id, type, msg) {
   const el = document.getElementById(id);
   const colors = {success: 'var(--green)', error: 'var(--red)', info: 'var(--accent)', warning: 'var(--yellow)'};
-  el.innerHTML = `<span style="color:${colors[type] || 'var(--fg)'};">${msg}</span>`;
+  el.innerHTML = `<span style="color:${colors[type] || 'var(--fg-primary)'};">${msg}</span>`;
 }
 
 function setLoading(on) {

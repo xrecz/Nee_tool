@@ -1,12 +1,15 @@
 {% extends "base.html" %}
 {% set active = "dashboard" %}
-{% block title %}Bericht generieren — Nee Tool{% endblock %}
+{% block title %}Bericht generieren — TerraRecon{% endblock %}
 
 {% block content %}
-<h1>Bericht generieren</h1>
-<p style="color:var(--fg2);margin-bottom:1.5rem;">Projekt: <strong>{{ project.name }}</strong> | Target: {{ project.target }}</p>
+<div class="toolbar">
+  <h1>◈ Bericht generieren</h1>
+</div>
 
-<div class="card" style="max-width:700px;">
+<p class="text-muted mb-3">Projekt: <strong style="color:var(--fg-primary);">{{ project.name }}</strong> · Target: <span class="mono">{{ project.target }}</span></p>
+
+<div class="card" style="max-width:720px;">
   <div class="form-group">
     <label for="client">Auftraggeber / Firmenname *</label>
     <input type="text" id="client" placeholder="Firma XYZ GmbH">
@@ -17,14 +20,15 @@
     <input type="text" id="author" value="Security Team">
   </div>
 
-  <div class="form-group">
-    <label for="date_range">Testzeitraum</label>
-    <input type="text" id="date_range" placeholder="01.03.2026 - 31.03.2026">
-  </div>
-
-  <div class="form-group">
-    <label for="version">Version</label>
-    <input type="text" id="version" value="1.0" placeholder="1.0">
+  <div class="grid grid-2">
+    <div class="form-group">
+      <label for="date_range">Testzeitraum</label>
+      <input type="text" id="date_range" placeholder="01.03.2026 - 31.03.2026">
+    </div>
+    <div class="form-group">
+      <label for="version">Version</label>
+      <input type="text" id="version" value="1.0" placeholder="1.0">
+    </div>
   </div>
 
   <div class="form-group">
@@ -32,8 +36,8 @@
     <textarea id="summary" rows="5" placeholder="Projektbeschreibung und übergeordnete Bewertung..."></textarea>
   </div>
 
-  <div style="display:flex;gap:0.5rem;margin-top:1.5rem;">
-    <a id="btn-pdf" class="btn btn-primary" onclick="download('pdf')">PDF herunterladen</a>
+  <div class="flex gap-sm mt-2">
+    <a id="btn-pdf" class="btn btn-primary" onclick="download('pdf')">↓ PDF herunterladen</a>
     <a id="btn-html" class="btn" onclick="download('html')">HTML-Vorschau</a>
     <a href="/project?file={{ file }}" class="btn">Zurück</a>
   </div>

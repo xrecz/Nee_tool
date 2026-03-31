@@ -1,20 +1,20 @@
 {% extends "base.html" %}
 {% set active = "dashboard" %}
-{% block title %}{{ project.name }} — Nee Tool{% endblock %}
+{% block title %}{{ project.name }} — TerraRecon{% endblock %}
 
 {% block content %}
 <div class="toolbar">
   <div>
     <h1>{{ project.name }}</h1>
-    <span style="color:var(--fg2);">Target: {{ project.target }} | {{ project.created_at.__str__()[:19] }}</span>
+    <span class="text-muted">Target: <span class="mono">{{ project.target }}</span> · {{ project.created_at.__str__()[:19] }}</span>
   </div>
-  <div style="display:flex;gap:0.5rem;">
+  <div class="flex gap-sm">
     <a href="/project/add-finding?file={{ file }}" class="btn">+ Finding</a>
-    <a href="/report/form?file={{ file }}" class="btn btn-primary">Bericht generieren</a>
+    <a href="/report/form?file={{ file }}" class="btn btn-primary">◈ Bericht generieren</a>
   </div>
 </div>
 
-<!-- Stats -->
+<!-- Severity Stats -->
 {% set sev_counts = {} %}
 {% for f in findings %}
   {% if f.severity.value in sev_counts %}
@@ -24,7 +24,7 @@
   {% endif %}
 {% endfor %}
 
-<div class="grid grid-5">
+<div class="grid grid-5 mb-3">
   <div class="stat stat-critical">
     <span class="number">{{ sev_counts.get("critical", 0) }}</span>
     <span class="label">Critical</span>
@@ -50,48 +50,52 @@
 <!-- Scanner Results -->
 <h2>Scanner-Ergebnisse</h2>
 <div class="card">
-<table>
-  <thead><tr><th>Scanner</th><th>Status</th><th>Dauer</th><th>Ergebnis</th></tr></thead>
-  <tbody>
-  {% for r in project.scan_results %}
-  <tr>
-    <td>{{ r.scanner_name }}</td>
-    <td><span class="badge badge-{% if r.status.value == 'completed' %}success{% elif r.status.value == 'failed' %}critical{% else %}warning{% endif %}">{{ r.status.value }}</span></td>
-    <td>{{ r.duration_seconds }}s</td>
-    <td>
-      {% if r.hosts %}{{ r.hosts | length }} Hosts{% endif %}
-      {% if r.subdomains %} {{ r.subdomains | length }} Subdomains{% endif %}
-      {% if r.findings %} {{ r.findings | length }} Findings{% endif %}
-      {% if r.error %}<span style="color:var(--red)">{{ r.error[:60] }}</span>{% endif %}
-    </td>
-  </tr>
-  {% endfor %}
-  </tbody>
-</table>
+  <div class="table-wrapper">
+  <table>
+    <thead><tr><th>Scanner</th><th>Status</th><th>Dauer</th><th>Ergebnis</th></tr></thead>
+    <tbody>
+    {% for r in project.scan_results %}
+    <tr>
+      <td><strong>{{ r.scanner_name }}</strong></td>
+      <td><span class="badge badge-{% if r.status.value == 'completed' %}success{% elif r.status.value == 'failed' %}critical{% else %}warning{% endif %}">{{ r.status.value }}</span></td>
+      <td class="mono">{{ r.duration_seconds }}s</td>
+      <td>
+        {% if r.hosts %}{{ r.hosts | length }} Hosts{% endif %}
+        {% if r.subdomains %} {{ r.subdomains | length }} Subdomains{% endif %}
+        {% if r.findings %} {{ r.findings | length }} Findings{% endif %}
+        {% if r.error %}<span style="color:var(--red)">{{ r.error[:60] }}</span>{% endif %}
+      </td>
+    </tr>
+    {% endfor %}
+    </tbody>
+  </table>
+  </div>
 </div>
 
 <!-- Hosts -->
 {% if hosts %}
 <h2>Entdeckte Hosts ({{ hosts | length }})</h2>
 <div class="card">
-<table>
-  <thead><tr><th>Host</th><th>IP</th><th>Ports</th><th>Web</th><th>Technologien</th></tr></thead>
-  <tbody>
-  {% for key, host in hosts.items() %}
-  <tr>
-    <td><strong>{{ host.hostname }}</strong></td>
-    <td style="font-family:monospace;">{{ host.ip or "-" }}</td>
-    <td style="font-family:monospace;">
-      {% for p in host.ports[:8] %}{{ p.port }}{% if not loop.last %}, {% endif %}{% endfor %}
-      {% if host.ports | length > 8 %}+{{ host.ports | length - 8 }}{% endif %}
-      {% if not host.ports %}-{% endif %}
-    </td>
-    <td>{% if host.is_web %}<span class="badge badge-success">Ja</span>{% else %}-{% endif %}</td>
-    <td>{% for t in host.technologies[:4] %}<span class="tag">{{ t }}</span>{% endfor %}</td>
-  </tr>
-  {% endfor %}
-  </tbody>
-</table>
+  <div class="table-wrapper">
+  <table>
+    <thead><tr><th>Host</th><th>IP</th><th>Ports</th><th>Web</th><th>Technologien</th></tr></thead>
+    <tbody>
+    {% for key, host in hosts.items() %}
+    <tr>
+      <td><strong>{{ host.hostname }}</strong></td>
+      <td class="mono">{{ host.ip or "-" }}</td>
+      <td class="mono" style="font-size:0.82rem;">
+        {% for p in host.ports[:8] %}{{ p.port }}{% if not loop.last %}, {% endif %}{% endfor %}
+        {% if host.ports | length > 8 %}<span style="color:var(--fg-muted);">+{{ host.ports | length - 8 }}</span>{% endif %}
+        {% if not host.ports %}<span style="color:var(--fg-muted);">-</span>{% endif %}
+      </td>
+      <td>{% if host.is_web %}<span class="badge badge-success">Ja</span>{% else %}<span style="color:var(--fg-muted);">-</span>{% endif %}</td>
+      <td>{% for t in host.technologies[:4] %}<span class="tag">{{ t }}</span>{% endfor %}</td>
+    </tr>
+    {% endfor %}
+    </tbody>
+  </table>
+  </div>
 </div>
 {% endif %}
 
@@ -101,26 +105,27 @@
 <div class="card">
   <div style="display:flex;flex-wrap:wrap;gap:0.4rem;">
     {% for sub in subdomains %}
-    <span class="tag" style="font-family:monospace;">{{ sub }}</span>
+    <span class="tag mono">{{ sub }}</span>
     {% endfor %}
   </div>
 </div>
 {% endif %}
 
 <!-- Findings -->
-<div style="display:flex;justify-content:space-between;align-items:center;margin:1.5rem 0 0.8rem;">
+<div class="flex-between mt-3 mb-2">
   <h2 style="margin:0;">Findings ({{ findings | length }})</h2>
   {% if findings %}
-  <div style="display:flex;gap:0.5rem;">
-    <a href="/project/export/csv?file={{ file }}" class="btn btn-sm">&#8595; CSV</a>
-    <a href="/project/export/json?file={{ file }}" class="btn btn-sm">&#8595; JSON</a>
+  <div class="flex gap-sm">
+    <a href="/project/export/csv?file={{ file }}" class="btn btn-sm">↓ CSV</a>
+    <a href="/project/export/json?file={{ file }}" class="btn btn-sm">↓ JSON</a>
   </div>
   {% endif %}
 </div>
+
 {% if findings %}
   {% for f in findings %}
   <div class="finding finding-{{ f.severity.value }}">
-    <div style="display:flex;justify-content:space-between;align-items:center;">
+    <div class="flex-between">
       <div class="title">{{ f.title }}</div>
       <span class="badge badge-{{ f.severity.value }}">{{ f.severity.value | upper }}</span>
     </div>
@@ -138,6 +143,7 @@
   {% endfor %}
 {% else %}
 <div class="card empty">
+  <div class="icon">📋</div>
   <p>Keine Findings. <a href="/project/add-finding?file={{ file }}">Manuell hinzufügen</a></p>
 </div>
 {% endif %}

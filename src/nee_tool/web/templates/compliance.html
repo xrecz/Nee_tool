@@ -1,15 +1,18 @@
 {% extends "base.html" %}
 {% set active = "compliance" %}
-{% block title %}Compliance — Nee Tool{% endblock %}
+{% block title %}Compliance — TerraRecon{% endblock %}
 
 {% block content %}
-<h1>Compliance-Mapping</h1>
-<p class="text-muted">Findings → BSI IT-Grundschutz / ISO 27001:2022 / DSGVO Art. 32</p>
+<div class="toolbar">
+  <h1>☑ Compliance-Mapping</h1>
+</div>
+
+<p class="text-muted mb-3">Findings → BSI IT-Grundschutz / ISO 27001:2022 / DSGVO Art. 32</p>
 
 {% if summary %}
-<div class="grid grid-3" style="margin-bottom:2rem;">
+<div class="grid grid-3 mb-3">
   {% for framework, controls in summary.items() %}
-  <div class="stat-card" style="border-left-color: var(--primary);">
+  <div class="stat-card">
     <div class="stat-value">{{ controls | length }}</div>
     <div class="stat-label">{{ framework }} Controls</div>
   </div>
@@ -17,10 +20,10 @@
 </div>
 
 {% for framework, controls in summary.items() %}
-<div class="card" style="margin-bottom:1rem;">
-  <h3>{{ framework }}</h3>
+<div class="card mb-2">
+  <h3 style="margin-top:0;">{{ framework }}</h3>
   {% for ctrl in controls %}
-  <div style="padding:0.25rem 0; border-bottom: 1px solid var(--border);">
+  <div style="padding:0.4rem 0; border-bottom: 1px solid var(--border);">
     <code>{{ ctrl }}</code>
   </div>
   {% endfor %}
@@ -29,35 +32,40 @@
 
 {% if mappings %}
 <h2>Detail-Mapping</h2>
-<table>
-  <thead>
-    <tr>
-      <th>Finding</th>
-      <th>BSI</th>
-      <th>ISO 27001</th>
-      <th>DSGVO</th>
-    </tr>
-  </thead>
-  <tbody>
-    {% for m in mappings %}
-    <tr>
-      <td>{{ m.finding_title[:50] }}</td>
-      <td>{% for c in m.controls if c.framework == "BSI" %}<code>{{ c.control_id }}</code> {% endfor %}</td>
-      <td>{% for c in m.controls if c.framework == "ISO27001" %}<code>{{ c.control_id }}</code> {% endfor %}</td>
-      <td>{% for c in m.controls if c.framework == "DSGVO" %}<code>{{ c.control_id }}</code> {% endfor %}</td>
-    </tr>
-    {% endfor %}
-  </tbody>
-</table>
+<div class="card">
+  <div class="table-wrapper">
+  <table>
+    <thead>
+      <tr>
+        <th>Finding</th>
+        <th>BSI</th>
+        <th>ISO 27001</th>
+        <th>DSGVO</th>
+      </tr>
+    </thead>
+    <tbody>
+      {% for m in mappings %}
+      <tr>
+        <td><strong>{{ m.finding_title[:50] }}</strong></td>
+        <td>{% for c in m.controls if c.framework == "BSI" %}<code>{{ c.control_id }}</code> {% endfor %}</td>
+        <td>{% for c in m.controls if c.framework == "ISO27001" %}<code>{{ c.control_id }}</code> {% endfor %}</td>
+        <td>{% for c in m.controls if c.framework == "DSGVO" %}<code>{{ c.control_id }}</code> {% endfor %}</td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+  </div>
+</div>
 {% endif %}
 
 {% else %}
 <div class="card">
-  <p>Wähle ein Projekt für das Compliance-Mapping:</p>
+  <h3 style="margin-top:0;">Projekt auswählen</h3>
+  <p class="text-muted mb-2">Wähle ein Projekt für das Compliance-Mapping:</p>
   <div style="display:flex; flex-direction:column; gap:0.5rem;">
     {% for p in projects %}
-    <a href="/compliance?file={{ p.file }}" class="btn" style="text-align:left;">
-      {{ p.name }} — {{ p.findings }} Findings ({{ p.created }})
+    <a href="/compliance?file={{ p.file }}" class="btn" style="justify-content:flex-start;">
+      <strong>{{ p.name }}</strong> <span class="text-muted" style="margin-left:0.5rem;">— {{ p.findings }} Findings ({{ p.created }})</span>
     </a>
     {% endfor %}
   </div>

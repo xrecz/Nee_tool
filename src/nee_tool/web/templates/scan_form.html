@@ -1,11 +1,13 @@
 {% extends "base.html" %}
 {% set active = "scan" %}
-{% block title %}Neuer Scan — Nee Tool{% endblock %}
+{% block title %}Neuer Scan — TerraRecon{% endblock %}
 
 {% block content %}
-<h1>Neuer Scan</h1>
+<div class="toolbar">
+  <h1>⊳ Neuer Scan</h1>
+</div>
 
-<form action="/scan/start" method="POST" class="card" style="max-width:700px;">
+<form action="/scan/start" method="POST" class="card" style="max-width:720px;">
   <div class="form-group">
     <label for="target">Target Domain *</label>
     <input type="text" name="target" id="target" placeholder="example.de" required>
@@ -47,8 +49,8 @@
     </div>
   </div>
 
-  <button type="submit" class="btn btn-primary" style="margin-top:1rem;" id="submit-btn" onclick="this.disabled=true; this.innerHTML='&#9696; Scan wird gestartet...'; this.form.submit();">
-    Scan starten
+  <button type="submit" class="btn btn-primary" style="margin-top:0.5rem;" id="submit-btn" onclick="this.disabled=true; this.innerHTML='⟳ Scan wird gestartet...'; this.form.submit();">
+    ⊳ Scan starten
   </button>
 </form>
 

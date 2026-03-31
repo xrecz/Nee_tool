@@ -1,49 +1,56 @@
 {% extends "base.html" %}
 {% set active = "dashboard" %}
-{% block title %}Dashboard — Nee Tool{% endblock %}
+{% block title %}Dashboard — TerraRecon{% endblock %}
 
 {% block content %}
 <div class="toolbar">
   <h1>Dashboard</h1>
-  <a href="/scan" class="btn btn-primary">+ Neuer Scan</a>
+  <a href="/scan" class="btn btn-primary">⊳ Neuer Scan</a>
 </div>
 
 <!-- Running scans -->
 {% if scan_jobs %}
-<h2>Laufende Scans</h2>
+<h2>⟳ Laufende Scans</h2>
 <div class="card">
-<table>
-  <thead><tr><th>Projekt</th><th>Target</th><th>Gestartet</th><th>Status</th><th></th></tr></thead>
-  <tbody>
+  <div class="table-wrapper">
+  <table>
+    <thead><tr><th>Projekt</th><th>Target</th><th>Gestartet</th><th>Status</th><th></th></tr></thead>
+    <tbody>
+    {% for job_id, job in scan_jobs.items() %}
+    <tr>
+      <td><strong>{{ job.name }}</strong></td>
+      <td class="mono">{{ job.target }}</td>
+      <td style="color:var(--fg-secondary);">{{ job.started[:19] }}</td>
+      <td hx-get="/scan/status/{{ job_id }}" hx-trigger="every 3s" hx-swap="innerHTML">
+        {% if job.status == "running" %}
+        <span class="badge badge-running">⟳ Läuft...</span>
+        {% elif job.status == "completed" %}
+        <span class="badge badge-success">✓ Fertig</span>
+        {% elif job.status == "cancelled" %}
+        <span class="badge badge-warning">⊘ Abgebrochen</span>
+        {% elif job.status == "failed" %}
+        <span class="badge badge-critical">✕ Fehler</span>
+        {% endif %}
+      </td>
+      <td>
+        {% if job.status == "running" %}
+        <form action="/scan/cancel/{{ job_id }}" method="POST" style="display:inline;" onsubmit="return confirm('Scan wirklich abbrechen?')">
+          <button type="submit" class="btn btn-sm btn-danger">■ Stop</button>
+        </form>
+        {% elif job.status == "completed" and job.result_file %}
+        <a href="/project?file={{ job.result_file }}" class="btn btn-sm btn-primary">Ergebnisse</a>
+        {% endif %}
+      </td>
+    </tr>
+    {% endfor %}
+    </tbody>
+  </table>
+  </div>
   {% for job_id, job in scan_jobs.items() %}
-  <tr>
-    <td><strong>{{ job.name }}</strong></td>
-    <td>{{ job.target }}</td>
-    <td>{{ job.started[:19] }}</td>
-    <td hx-get="/scan/status/{{ job_id }}" hx-trigger="every 3s" hx-swap="innerHTML">
-      {% if job.status == "running" %}
-      <span class="badge badge-running">Läuft...</span>
-      {% elif job.status == "completed" %}
-      <span class="badge badge-success">Fertig</span>
-      {% elif job.status == "cancelled" %}
-      <span class="badge badge-warning">Abgebrochen</span>
-      {% elif job.status == "failed" %}
-      <span class="badge badge-critical" style="background:rgba(248,113,113,0.2);color:var(--red);">Fehler</span>
-      {% endif %}
-    </td>
-    <td>
-      {% if job.status == "running" %}
-      <form action="/scan/cancel/{{ job_id }}" method="POST" style="display:inline;" onsubmit="return confirm('Scan wirklich abbrechen?')">
-        <button type="submit" class="btn btn-sm btn-danger">&#9632; Stop</button>
-      </form>
-      {% elif job.status == "completed" and job.result_file %}
-      <a href="/project?file={{ job.result_file }}" class="btn btn-sm btn-primary">Ergebnisse</a>
-      {% endif %}
-    </td>
-  </tr>
+    {% if job.status == "running" %}
+    <div class="scan-running-bar" style="margin-top: 0.5rem;"></div>
+    {% endif %}
   {% endfor %}
-  </tbody>
-</table>
 </div>
 {% endif %}
 
@@ -52,66 +59,75 @@
 {% set missing_count = namespace(n=0) %}
 {% for name, missing in scanners.items() %}{% if missing %}{% set missing_count.n = missing_count.n + 1 %}{% endif %}{% endfor %}
 {% if missing_count.n > 0 %}
-<div class="card" style="border-left: 3px solid var(--yellow); background: rgba(251,191,36,0.07); margin-bottom:0.5rem;">
-  <strong style="color:var(--yellow);">&#9888; {{ missing_count.n }} Scanner-Tool(s) nicht gefunden</strong>
-  <p style="font-size:0.85rem; color:var(--fg2); margin-top:0.3rem;">
-    Fehlende Tools sind im Container nicht installiert. Die entsprechenden Scanner werden bei Scans übersprungen.
-  </p>
+<div class="alert alert-warning">
+  <span>⚠</span>
+  <div>
+    <strong>{{ missing_count.n }} Scanner-Tool(s) nicht gefunden</strong>
+    <p style="font-size:0.82rem; opacity:0.85; margin-top:0.2rem;">
+      Fehlende Tools sind im Container nicht installiert. Die entsprechenden Scanner werden bei Scans übersprungen.
+    </p>
+  </div>
 </div>
 {% endif %}
 <div class="card">
-<table>
-  <thead><tr><th>Scanner</th><th>Status</th><th>Fehlende Tools</th></tr></thead>
-  <tbody>
-  {% for name, missing in scanners.items() %}
-  <tr>
-    <td>{{ name }}</td>
-    <td>
-      {% if missing %}
-      <span class="badge badge-warning">&#9888; fehlt</span>
-      {% else %}
-      <span class="badge badge-success">&#10003; verfügbar</span>
-      {% endif %}
-    </td>
-    <td>
-      {% if missing %}
-      <span style="color:var(--yellow); font-family:monospace; font-size:0.85rem;">{{ missing | join(", ") }}</span>
-      {% else %}
-      <span style="color:var(--fg2);">—</span>
-      {% endif %}
-    </td>
-  </tr>
-  {% endfor %}
-  </tbody>
-</table>
+  <div class="table-wrapper">
+  <table>
+    <thead><tr><th>Scanner</th><th>Status</th><th>Fehlende Tools</th></tr></thead>
+    <tbody>
+    {% for name, missing in scanners.items() %}
+    <tr>
+      <td><strong>{{ name }}</strong></td>
+      <td>
+        {% if missing %}
+        <span class="badge badge-warning">⚠ fehlt</span>
+        {% else %}
+        <span class="badge badge-success">✓ verfügbar</span>
+        {% endif %}
+      </td>
+      <td>
+        {% if missing %}
+        <span class="mono" style="color:var(--yellow); font-size:0.82rem;">{{ missing | join(", ") }}</span>
+        {% else %}
+        <span style="color:var(--fg-muted);">—</span>
+        {% endif %}
+      </td>
+    </tr>
+    {% endfor %}
+    </tbody>
+  </table>
+  </div>
 </div>
 
 <!-- Recent projects -->
 <h2>Projekte</h2>
 {% if projects %}
 <div class="card">
-<table>
-  <thead><tr><th>Projekt</th><th>Target</th><th>Erstellt</th><th>Hosts</th><th>Findings</th><th></th></tr></thead>
-  <tbody>
-  {% for p in projects %}
-  <tr>
-    <td><strong>{{ p.name }}</strong></td>
-    <td>{{ p.target }}</td>
-    <td>{{ p.created }}</td>
-    <td>{{ p.hosts }}</td>
-    <td>{{ p.findings }}</td>
-    <td>
-      <a href="/project?file={{ p.file }}" class="btn btn-sm">Öffnen</a>
-      <a href="/report/form?file={{ p.file }}" class="btn btn-sm">Bericht</a>
-    </td>
-  </tr>
-  {% endfor %}
-  </tbody>
-</table>
+  <div class="table-wrapper">
+  <table>
+    <thead><tr><th>Projekt</th><th>Target</th><th>Erstellt</th><th>Hosts</th><th>Findings</th><th></th></tr></thead>
+    <tbody>
+    {% for p in projects %}
+    <tr>
+      <td><strong>{{ p.name }}</strong></td>
+      <td class="mono">{{ p.target }}</td>
+      <td style="color:var(--fg-secondary);">{{ p.created }}</td>
+      <td>{{ p.hosts }}</td>
+      <td><strong>{{ p.findings }}</strong></td>
+      <td>
+        <div class="flex gap-sm">
+          <a href="/project?file={{ p.file }}" class="btn btn-sm">Öffnen</a>
+          <a href="/report/form?file={{ p.file }}" class="btn btn-sm">Bericht</a>
+        </div>
+      </td>
+    </tr>
+    {% endfor %}
+    </tbody>
+  </table>
+  </div>
 </div>
 {% else %}
 <div class="card empty">
-  <div class="icon">&#128269;</div>
+  <div class="icon">🔍</div>
   <p>Noch keine Projekte. Starte deinen ersten Scan!</p>
   <a href="/scan" class="btn btn-primary" style="margin-top:1rem;">Scan starten</a>
 </div>

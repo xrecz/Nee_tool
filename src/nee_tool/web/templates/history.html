@@ -1,80 +1,84 @@
 {% extends "base.html" %}
 {% set active = "history" %}
-{% block title %}Scan-History — Nee Tool{% endblock %}
+{% block title %}Scan-History — TerraRecon{% endblock %}
 
 {% block content %}
 <div class="toolbar">
-  <h1>Scan-History</h1>
-  <a href="/scan" class="btn btn-primary">+ Neuer Scan</a>
+  <h1>⟳ Scan-History</h1>
+  <a href="/scan" class="btn btn-primary">⊳ Neuer Scan</a>
 </div>
 
 {% if projects %}
 <div class="card">
-<table>
-  <thead>
+  <div class="table-wrapper">
+  <table>
+    <thead>
+      <tr>
+        <th>Projekt</th>
+        <th>Target</th>
+        <th>Datum</th>
+        <th>Hosts</th>
+        <th>Findings</th>
+        <th>Critical</th>
+        <th>High</th>
+        <th>Medium</th>
+        <th>Low</th>
+        <th></th>
+      </tr>
+    </thead>
+    <tbody>
+    {% for p in projects %}
     <tr>
-      <th>Projekt</th>
-      <th>Target</th>
-      <th>Datum</th>
-      <th>Hosts</th>
-      <th>Findings</th>
-      <th>Critical</th>
-      <th>High</th>
-      <th>Medium</th>
-      <th>Low</th>
-      <th></th>
+      <td><strong>{{ p.name }}</strong></td>
+      <td class="mono">{{ p.target }}</td>
+      <td style="color:var(--fg-secondary);">{{ p.created }}</td>
+      <td>{{ p.hosts }}</td>
+      <td><strong>{{ p.findings }}</strong></td>
+      <td>
+        {% if p.sev.get("critical", 0) > 0 %}
+        <span class="badge badge-critical">{{ p.sev.get("critical", 0) }}</span>
+        {% else %}
+        <span style="color:var(--fg-muted);">0</span>
+        {% endif %}
+      </td>
+      <td>
+        {% if p.sev.get("high", 0) > 0 %}
+        <span class="badge badge-high">{{ p.sev.get("high", 0) }}</span>
+        {% else %}
+        <span style="color:var(--fg-muted);">0</span>
+        {% endif %}
+      </td>
+      <td>
+        {% if p.sev.get("medium", 0) > 0 %}
+        <span class="badge badge-medium">{{ p.sev.get("medium", 0) }}</span>
+        {% else %}
+        <span style="color:var(--fg-muted);">0</span>
+        {% endif %}
+      </td>
+      <td>
+        {% if p.sev.get("low", 0) > 0 %}
+        <span class="badge badge-low">{{ p.sev.get("low", 0) }}</span>
+        {% else %}
+        <span style="color:var(--fg-muted);">0</span>
+        {% endif %}
+      </td>
+      <td>
+        <div class="flex gap-sm">
+          <a href="/project?file={{ p.file }}" class="btn btn-sm btn-primary">Öffnen</a>
+          <a href="/report/form?file={{ p.file }}" class="btn btn-sm">Bericht</a>
+        </div>
+      </td>
     </tr>
-  </thead>
-  <tbody>
-  {% for p in projects %}
-  <tr>
-    <td><strong>{{ p.name }}</strong></td>
-    <td style="font-family:monospace;">{{ p.target }}</td>
-    <td style="color:var(--fg2);">{{ p.created }}</td>
-    <td>{{ p.hosts }}</td>
-    <td><strong>{{ p.findings }}</strong></td>
-    <td>
-      {% if p.sev.get("critical", 0) > 0 %}
-      <span class="badge badge-critical">{{ p.sev.get("critical", 0) }}</span>
-      {% else %}
-      <span style="color:var(--fg2);">0</span>
-      {% endif %}
-    </td>
-    <td>
-      {% if p.sev.get("high", 0) > 0 %}
-      <span class="badge badge-high">{{ p.sev.get("high", 0) }}</span>
-      {% else %}
-      <span style="color:var(--fg2);">0</span>
-      {% endif %}
-    </td>
-    <td>
-      {% if p.sev.get("medium", 0) > 0 %}
-      <span class="badge badge-medium">{{ p.sev.get("medium", 0) }}</span>
-      {% else %}
-      <span style="color:var(--fg2);">0</span>
-      {% endif %}
-    </td>
-    <td>
-      {% if p.sev.get("low", 0) > 0 %}
-      <span class="badge badge-low">{{ p.sev.get("low", 0) }}</span>
-      {% else %}
-      <span style="color:var(--fg2);">0</span>
-      {% endif %}
-    </td>
-    <td>
-      <a href="/project?file={{ p.file }}" class="btn btn-sm btn-primary">Öffnen</a>
-      <a href="/report/form?file={{ p.file }}" class="btn btn-sm">Bericht</a>
-    </td>
-  </tr>
-  {% endfor %}
-  </tbody>
-</table>
+    {% endfor %}
+    </tbody>
+  </table>
+  </div>
 </div>
 {% else %}
 <div class="card empty">
-  <div class="icon">&#128337;</div>
+  <div class="icon">⟳</div>
   <p>Keine Scan-History vorhanden.</p>
-  <a href="/scan" class="btn btn-primary" style="margin-top:1rem;">Ersten Scan starten</a>
+  <a href="/scan" class="btn btn-primary mt-2">Ersten Scan starten</a>
 </div>
 {% endif %}
 {% endblock %}
