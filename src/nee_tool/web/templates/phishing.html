@@ -1,0 +1,195 @@
+{% extends "base.html" %}
+{% set active = "phishing" %}
+{% block title %}Phishing — Nee Tool{% endblock %}
+
+{% block content %}
+<div class="toolbar">
+  <h1>&#127907; GoPhish Integration</h1>
+</div>
+
+<!-- Connection form -->
+<div class="card" style="max-width:700px; margin-bottom:1.5rem;">
+  <h2 style="margin-top:0;">GoPhish Verbindung</h2>
+  <form id="connect-form" onsubmit="connectGophish(event)">
+    <div class="grid grid-2">
+      <div class="form-group">
+        <label for="gp-host">GoPhish Host</label>
+        <input type="text" id="gp-host" placeholder="https://localhost:3333" value="{{ config.host if config else 'https://localhost:3333' }}">
+      </div>
+      <div class="form-group">
+        <label for="gp-key">API Key</label>
+        <input type="text" id="gp-key" placeholder="API-Schlüssel aus GoPhish" value="{{ config.api_key if config else '' }}">
+      </div>
+    </div>
+    <div id="connect-status" style="margin-bottom:0.8rem;"></div>
+    <button type="submit" class="btn btn-primary" id="connect-btn">
+      <span id="connect-spinner" style="display:none;">&#9696; </span>
+      Verbinden &amp; testen
+    </button>
+  </form>
+</div>
+
+<!-- Campaigns section — visible after connecting -->
+<div id="campaigns-section" style="display:none;">
+  <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:1rem;">
+    <h2 style="margin:0;">Kampagnen</h2>
+    <button class="btn btn-primary" onclick="loadCampaigns()">&#8635; Aktualisieren</button>
+  </div>
+  <div id="campaigns-list">
+    <div class="card empty"><p>Lade Kampagnen...</p></div>
+  </div>
+</div>
+
+<!-- Resources section -->
+<div id="resources-section" style="display:none;">
+  <div class="grid grid-3" style="margin-top:1.5rem;">
+    <div class="card">
+      <h3 style="margin:0 0 0.5rem;">E-Mail-Templates</h3>
+      <div id="templates-list"><span style="color:var(--fg2);">Lade...</span></div>
+    </div>
+    <div class="card">
+      <h3 style="margin:0 0 0.5rem;">Gruppen</h3>
+      <div id="groups-list"><span style="color:var(--fg2);">Lade...</span></div>
+    </div>
+    <div class="card">
+      <h3 style="margin:0 0 0.5rem;">Landing Pages</h3>
+      <div id="pages-list"><span style="color:var(--fg2);">Lade...</span></div>
+    </div>
+  </div>
+</div>
+
+<script>
+let _gpHost = '';
+let _gpKey = '';
+
+function connectGophish(e) {
+  e.preventDefault();
+  _gpHost = document.getElementById('gp-host').value.trim();
+  _gpKey  = document.getElementById('gp-key').value.trim();
+
+  if (!_gpHost || !_gpKey) {
+    showStatus('connect-status', 'error', 'Host und API-Key sind erforderlich.');
+    return;
+  }
+
+  setLoading(true);
+  showStatus('connect-status', 'info', 'Verbinde...');
+
+  fetch('/api/phishing/connect', {
+    method: 'POST',
+    headers: {'Content-Type': 'application/json'},
+    body: JSON.stringify({host: _gpHost, api_key: _gpKey})
+  })
+  .then(r => r.json())
+  .then(data => {
+    setLoading(false);
+    if (data.ok) {
+      showStatus('connect-status', 'success', '&#10003; Verbunden! GoPhish erreichbar.');
+      document.getElementById('campaigns-section').style.display = 'block';
+      document.getElementById('resources-section').style.display = 'block';
+      loadCampaigns();
+      loadResources();
+    } else {
+      showStatus('connect-status', 'error', '&#10007; Fehler: ' + (data.error || 'Unbekannter Fehler'));
+    }
+  })
+  .catch(err => {
+    setLoading(false);
+    showStatus('connect-status', 'error', '&#10007; Verbindungsfehler: ' + err.message);
+  });
+}
+
+function loadCampaigns() {
+  document.getElementById('campaigns-list').innerHTML = '<div class="card empty"><p>Lade...</p></div>';
+  fetch(`/api/phishing/campaigns?host=${encodeURIComponent(_gpHost)}&api_key=${encodeURIComponent(_gpKey)}`)
+  .then(r => r.json())
+  .then(data => {
+    if (data.error) {
+      document.getElementById('campaigns-list').innerHTML = `<div class="card"><p style="color:var(--red);">Fehler: ${data.error}</p></div>`;
+      return;
+    }
+    const campaigns = data.campaigns || [];
+    if (!campaigns.length) {
+      document.getElementById('campaigns-list').innerHTML = '<div class="card empty"><p>Keine Kampagnen vorhanden. Erstelle eine direkt in GoPhish.</p></div>';
+      return;
+    }
+    let html = '<div class="card"><table><thead><tr><th>Name</th><th>Status</th><th>Erstellt</th><th>Ziele</th><th>Gesendet</th><th>Geöffnet</th><th>Geklickt</th><th>Credentials</th></tr></thead><tbody>';
+    for (const c of campaigns) {
+      const stats = c.stats || {};
+      const statusBadge = statusClass(c.status);
+      html += `<tr>
+        <td><strong>${esc(c.name)}</strong></td>
+        <td><span class="badge ${statusBadge}">${esc(c.status)}</span></td>
+        <td style="color:var(--fg2);font-size:0.85rem;">${(c.created_date || '').substring(0,10)}</td>
+        <td>${stats.total || 0}</td>
+        <td>${stats.sent || 0}</td>
+        <td>${stats.opened || 0}</td>
+        <td>${stats.clicked || 0}</td>
+        <td>${stats.submitted_data || 0}</td>
+      </tr>`;
+    }
+    html += '</tbody></table></div>';
+    document.getElementById('campaigns-list').innerHTML = html;
+  })
+  .catch(err => {
+    document.getElementById('campaigns-list').innerHTML = `<div class="card"><p style="color:var(--red);">Fehler beim Laden: ${err.message}</p></div>`;
+  });
+}
+
+function loadResources() {
+  // Templates
+  fetch(`/api/phishing/templates?host=${encodeURIComponent(_gpHost)}&api_key=${encodeURIComponent(_gpKey)}`)
+  .then(r => r.json())
+  .then(data => {
+    const items = data.items || [];
+    document.getElementById('templates-list').innerHTML = items.length
+      ? items.map(t => `<div style="padding:0.3rem 0; border-bottom:1px solid var(--border); font-size:0.85rem;">${esc(t.name)}</div>`).join('')
+      : '<span style="color:var(--fg2);">Keine Templates</span>';
+  }).catch(() => { document.getElementById('templates-list').innerHTML = '<span style="color:var(--red);">Fehler</span>'; });
+
+  // Groups
+  fetch(`/api/phishing/groups?host=${encodeURIComponent(_gpHost)}&api_key=${encodeURIComponent(_gpKey)}`)
+  .then(r => r.json())
+  .then(data => {
+    const items = data.items || [];
+    document.getElementById('groups-list').innerHTML = items.length
+      ? items.map(g => `<div style="padding:0.3rem 0; border-bottom:1px solid var(--border); font-size:0.85rem;">${esc(g.name)} <span style="color:var(--fg2);">(${(g.targets||[]).length} Ziele)</span></div>`).join('')
+      : '<span style="color:var(--fg2);">Keine Gruppen</span>';
+  }).catch(() => { document.getElementById('groups-list').innerHTML = '<span style="color:var(--red);">Fehler</span>'; });
+
+  // Pages
+  fetch(`/api/phishing/pages?host=${encodeURIComponent(_gpHost)}&api_key=${encodeURIComponent(_gpKey)}`)
+  .then(r => r.json())
+  .then(data => {
+    const items = data.items || [];
+    document.getElementById('pages-list').innerHTML = items.length
+      ? items.map(p => `<div style="padding:0.3rem 0; border-bottom:1px solid var(--border); font-size:0.85rem;">${esc(p.name)}</div>`).join('')
+      : '<span style="color:var(--fg2);">Keine Pages</span>';
+  }).catch(() => { document.getElementById('pages-list').innerHTML = '<span style="color:var(--red);">Fehler</span>'; });
+}
+
+function statusClass(s) {
+  if (!s) return 'badge-info';
+  s = s.toLowerCase();
+  if (s === 'completed') return 'badge-success';
+  if (s === 'in progress') return 'badge-running';
+  if (s === 'queued') return 'badge-warning';
+  return 'badge-info';
+}
+
+function showStatus(id, type, msg) {
+  const el = document.getElementById(id);
+  const colors = {success: 'var(--green)', error: 'var(--red)', info: 'var(--accent)', warning: 'var(--yellow)'};
+  el.innerHTML = `<span style="color:${colors[type] || 'var(--fg)'};">${msg}</span>`;
+}
+
+function setLoading(on) {
+  document.getElementById('connect-btn').disabled = on;
+  document.getElementById('connect-spinner').style.display = on ? 'inline' : 'none';
+}
+
+function esc(s) {
+  return String(s || '').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+}
+</script>
+{% endblock %}

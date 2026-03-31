@@ -47,7 +47,9 @@
     </div>
   </div>
 
-  <button type="submit" class="btn btn-primary" style="margin-top:1rem;">Scan starten</button>
+  <button type="submit" class="btn btn-primary" style="margin-top:1rem;" id="submit-btn" onclick="this.disabled=true; this.innerHTML='&#9696; Scan wird gestartet...'; this.form.submit();">
+    Scan starten
+  </button>
 </form>
 
 <script>

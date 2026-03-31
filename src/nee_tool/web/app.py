@@ -18,8 +18,11 @@ from dotenv import load_dotenv
 # Load .env file at startup (before any os.getenv calls)
 load_dotenv()
 
+import csv
+import io
+
 from fastapi import Depends, FastAPI, Form, HTTPException, Request, UploadFile, File
-from fastapi.responses import FileResponse, HTMLResponse, RedirectResponse
+from fastapi.responses import FileResponse, HTMLResponse, JSONResponse, RedirectResponse, StreamingResponse
 from fastapi.security import HTTPBasic, HTTPBasicCredentials
 from fastapi.staticfiles import StaticFiles
 from jinja2 import Environment, FileSystemLoader
@@ -91,6 +94,9 @@ def _save_scan_jobs(jobs: dict[str, dict]) -> None:
 
 # Load persisted jobs on startup
 _scan_jobs: dict[str, dict] = _load_scan_jobs()
+
+# Cancellation flags: job_id -> threading.Event (set = cancel requested)
+_cancel_flags: dict[str, threading.Event] = {}
 
 # ── Helper functions ────────────────────────────────────────
 
@@ -174,25 +180,38 @@ async def scan_start(
     }
     _save_scan_jobs(_scan_jobs)
 
+    cancel_event = threading.Event()
+    _cancel_flags[job_id] = cancel_event
+
     def _run():
-        config = Config.default()
-        if profile and profile in SCAN_PROFILES:
-            apply_profile(config, profile)
-        config.scan.nmap_top_ports = top_ports
-        if scanners:
-            config.pipeline.enabled_scanners = scanners
+        try:
+            config = Config.default()
+            if profile and profile in SCAN_PROFILES:
+                apply_profile(config, profile)
+            config.scan.nmap_top_ports = top_ports
+            if scanners:
+                config.pipeline.enabled_scanners = scanners
 
-        orchestrator = PipelineOrchestrator(config)
-        project = orchestrator.run(project_name, target)
+            orchestrator = PipelineOrchestrator(config)
+            project = orchestrator.run(project_name, target, cancel_event=cancel_event)
 
-        out_dir = config.project_dir(project_name)
-        result_file = export_project(project, out_dir)
+            if cancel_event.is_set():
+                _scan_jobs[job_id]["status"] = "cancelled"
+                _save_scan_jobs(_scan_jobs)
+                return
 
-        _scan_jobs[job_id]["status"] = "completed"
-        _scan_jobs[job_id]["result_file"] = str(result_file)
-        _scan_jobs[job_id]["findings"] = len(project.all_findings())
-        _scan_jobs[job_id]["hosts"] = len(project.all_hosts())
-        _save_scan_jobs(_scan_jobs)
+            out_dir = config.project_dir(project_name)
+            result_file = export_project(project, out_dir)
+
+            _scan_jobs[job_id]["status"] = "completed"
+            _scan_jobs[job_id]["result_file"] = str(result_file)
+            _scan_jobs[job_id]["findings"] = len(project.all_findings())
+            _scan_jobs[job_id]["hosts"] = len(project.all_hosts())
+            _save_scan_jobs(_scan_jobs)
+        except Exception as exc:
+            _scan_jobs[job_id]["status"] = "failed"
+            _scan_jobs[job_id]["error"] = str(exc)
+            _save_scan_jobs(_scan_jobs)
 
     thread = threading.Thread(target=_run, daemon=True)
     thread.start()
@@ -207,13 +226,39 @@ async def scan_status(job_id: str):
     """HTMX endpoint: poll scan status (no auth required)."""
     job = _scan_jobs.get(job_id, {})
     if not job:
-        return HTMLResponse('<span class="tag is-danger">Nicht gefunden</span>')
-    if job["status"] == "running":
-        return HTMLResponse('<span class="badge bg-warning">Läuft...</span>')
-    return HTMLResponse(
-        f'<span class="badge bg-success">Fertig</span> '
-        f'<a href="/project?file={job.get("result_file", "")}">Öffnen</a>'
-    )
+        return HTMLResponse('<span class="badge" style="background:rgba(248,113,113,0.2);color:var(--red);">Nicht gefunden</span>')
+    status = job.get("status", "unknown")
+    if status == "running":
+        return HTMLResponse('<span class="badge badge-running">Läuft...</span>')
+    elif status == "completed":
+        result_file = job.get("result_file", "")
+        return HTMLResponse(
+            f'<span class="badge badge-success">Fertig</span> '
+            f'<a href="/project?file={result_file}" class="btn btn-sm btn-primary">Öffnen</a>'
+        )
+    elif status == "cancelled":
+        return HTMLResponse('<span class="badge badge-warning">Abgebrochen</span>')
+    else:
+        err = job.get("error", "")[:60]
+        return HTMLResponse(f'<span class="badge" style="background:rgba(248,113,113,0.2);color:var(--red);">Fehler: {err}</span>')
+
+
+@app.post("/scan/cancel/{job_id}")
+async def scan_cancel(job_id: str, _auth: HTTPBasicCredentials = Depends(require_auth)):
+    """Cancel a running scan."""
+    job = _scan_jobs.get(job_id)
+    if not job:
+        raise HTTPException(status_code=404, detail="Scan-Job nicht gefunden")
+    if job.get("status") != "running":
+        raise HTTPException(status_code=400, detail="Scan läuft nicht mehr")
+
+    cancel_event = _cancel_flags.get(job_id)
+    if cancel_event:
+        cancel_event.set()
+
+    _scan_jobs[job_id]["status"] = "cancelled"
+    _save_scan_jobs(_scan_jobs)
+    return RedirectResponse(url="/", status_code=303)
 
 
 @app.get("/project", response_class=HTMLResponse)
@@ -363,6 +408,82 @@ async def retest_compare(
 
 # ── Compliance Routes ──────────────────────────────────────
 
+@app.get("/project/export/csv")
+async def export_findings_csv(file: str, _auth: HTTPBasicCredentials = Depends(require_auth)):
+    """Export project findings as CSV download."""
+    project = _load_project(file)
+    if not project:
+        raise HTTPException(status_code=404, detail="Projekt nicht gefunden")
+
+    findings = project.all_findings()
+    output = io.StringIO()
+    writer = csv.writer(output)
+    writer.writerow(["Severity", "Title", "Description", "Evidence", "Recommendation", "Tags"])
+    for f in findings:
+        writer.writerow([
+            f.severity.value,
+            f.title,
+            f.description,
+            f.evidence or "",
+            f.recommendation or "",
+            ", ".join(f.tags) if f.tags else "",
+        ])
+    output.seek(0)
+    filename = Path(file).stem + "_findings.csv"
+    return StreamingResponse(
+        iter([output.getvalue()]),
+        media_type="text/csv",
+        headers={"Content-Disposition": f'attachment; filename="{filename}"'},
+    )
+
+
+@app.get("/project/export/json")
+async def export_findings_json(file: str, _auth: HTTPBasicCredentials = Depends(require_auth)):
+    """Export project findings as JSON download."""
+    project = _load_project(file)
+    if not project:
+        raise HTTPException(status_code=404, detail="Projekt nicht gefunden")
+
+    findings = [
+        {
+            "severity": f.severity.value,
+            "title": f.title,
+            "description": f.description,
+            "evidence": f.evidence,
+            "recommendation": f.recommendation,
+            "tags": f.tags,
+        }
+        for f in project.all_findings()
+    ]
+    payload = json.dumps({"project": project.name, "target": project.target, "findings": findings}, indent=2, ensure_ascii=False)
+    filename = Path(file).stem + "_findings.json"
+    return StreamingResponse(
+        iter([payload]),
+        media_type="application/json",
+        headers={"Content-Disposition": f'attachment; filename="{filename}"'},
+    )
+
+
+@app.get("/history", response_class=HTMLResponse)
+async def history_view(_auth: HTTPBasicCredentials = Depends(require_auth)):
+    """Scan history: list all output projects with severity breakdown."""
+    raw_projects = _get_projects()
+    # Enrich with severity counts
+    enriched = []
+    for p in raw_projects:
+        sev = {"critical": 0, "high": 0, "medium": 0, "low": 0, "info": 0}
+        try:
+            data = json.loads(Path(p["file"]).read_text())
+            for result in data.get("scan_results", []):
+                for f in result.get("findings", []):
+                    s = f.get("severity", "info")
+                    sev[s] = sev.get(s, 0) + 1
+        except Exception:
+            pass
+        enriched.append({**p, "sev": sev})
+    return _render("history.html", projects=enriched)
+
+
 @app.get("/compliance", response_class=HTMLResponse)
 async def compliance_view(file: str = "", _auth: HTTPBasicCredentials = Depends(require_auth)):
     """Show compliance mapping for a project."""
@@ -379,3 +500,109 @@ async def compliance_view(file: str = "", _auth: HTTPBasicCredentials = Depends(
     mappings = map_all_findings(findings)
 
     return _render("compliance.html", projects=[], summary=summary, mappings=mappings)
+
+
+# ── Phishing Routes ────────────────────────────────────────
+
+@app.get("/phishing", response_class=HTMLResponse)
+async def phishing_view(_auth: HTTPBasicCredentials = Depends(require_auth)):
+    """GoPhish integration dashboard."""
+    return _render("phishing.html", config=None)
+
+
+@app.post("/api/phishing/connect")
+async def phishing_connect(request: Request, _auth: HTTPBasicCredentials = Depends(require_auth)):
+    """Test GoPhish connection and return status."""
+    from nee_tool.phishing.client import GoPhishClient, GoPhishConfig, GoPhishError
+
+    body = await request.json()
+    host = body.get("host", "").strip()
+    api_key = body.get("api_key", "").strip()
+
+    if not host or not api_key:
+        return JSONResponse({"ok": False, "error": "Host und API-Key erforderlich"})
+
+    try:
+        client = GoPhishClient(GoPhishConfig(host=host, api_key=api_key))
+        campaigns = client.list_campaigns()
+        return JSONResponse({"ok": True, "campaign_count": len(campaigns) if isinstance(campaigns, list) else 0})
+    except GoPhishError as e:
+        return JSONResponse({"ok": False, "error": str(e)})
+    except Exception as e:
+        return JSONResponse({"ok": False, "error": f"Unerwarteter Fehler: {e}"})
+
+
+@app.get("/api/phishing/campaigns")
+async def phishing_campaigns(
+    host: str,
+    api_key: str,
+    _auth: HTTPBasicCredentials = Depends(require_auth),
+):
+    """List all GoPhish campaigns."""
+    from nee_tool.phishing.client import GoPhishClient, GoPhishConfig, GoPhishError
+
+    try:
+        client = GoPhishClient(GoPhishConfig(host=host, api_key=api_key))
+        campaigns = client.list_campaigns()
+        return JSONResponse({"campaigns": campaigns if isinstance(campaigns, list) else []})
+    except GoPhishError as e:
+        return JSONResponse({"error": str(e)})
+    except Exception as e:
+        return JSONResponse({"error": f"Fehler: {e}"})
+
+
+@app.get("/api/phishing/templates")
+async def phishing_templates(
+    host: str,
+    api_key: str,
+    _auth: HTTPBasicCredentials = Depends(require_auth),
+):
+    """List all GoPhish email templates."""
+    from nee_tool.phishing.client import GoPhishClient, GoPhishConfig, GoPhishError
+
+    try:
+        client = GoPhishClient(GoPhishConfig(host=host, api_key=api_key))
+        items = client.list_templates()
+        return JSONResponse({"items": items if isinstance(items, list) else []})
+    except GoPhishError as e:
+        return JSONResponse({"error": str(e), "items": []})
+    except Exception as e:
+        return JSONResponse({"error": str(e), "items": []})
+
+
+@app.get("/api/phishing/groups")
+async def phishing_groups(
+    host: str,
+    api_key: str,
+    _auth: HTTPBasicCredentials = Depends(require_auth),
+):
+    """List all GoPhish target groups."""
+    from nee_tool.phishing.client import GoPhishClient, GoPhishConfig, GoPhishError
+
+    try:
+        client = GoPhishClient(GoPhishConfig(host=host, api_key=api_key))
+        items = client.list_groups()
+        return JSONResponse({"items": items if isinstance(items, list) else []})
+    except GoPhishError as e:
+        return JSONResponse({"error": str(e), "items": []})
+    except Exception as e:
+        return JSONResponse({"error": str(e), "items": []})
+
+
+@app.get("/api/phishing/pages")
+async def phishing_pages(
+    host: str,
+    api_key: str,
+    _auth: HTTPBasicCredentials = Depends(require_auth),
+):
+    """List all GoPhish landing pages."""
+    from nee_tool.phishing.client import GoPhishClient, GoPhishConfig, GoPhishError
+
+    try:
+        client = GoPhishClient(GoPhishConfig(host=host, api_key=api_key))
+        items = client.list_pages()
+        return JSONResponse({"items": items if isinstance(items, list) else []})
+    except GoPhishError as e:
+        return JSONResponse({"error": str(e), "items": []})
+    except Exception as e:
+        return JSONResponse({"error": str(e), "items": []})

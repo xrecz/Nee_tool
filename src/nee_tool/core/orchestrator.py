@@ -7,6 +7,7 @@ on the previous ones' output.
 
 from __future__ import annotations
 
+import threading
 from datetime import datetime
 
 from rich.console import Console
@@ -50,7 +51,13 @@ class PipelineOrchestrator:
     def __init__(self, config: Config | None = None):
         self.config = config or Config.default()
 
-    def run(self, project_name: str, target: str, scope: list[str] | None = None) -> Project:
+    def run(
+        self,
+        project_name: str,
+        target: str,
+        scope: list[str] | None = None,
+        cancel_event: threading.Event | None = None,
+    ) -> Project:
         """Execute the full recon pipeline."""
         project = Project(
             name=project_name,
@@ -77,6 +84,10 @@ class PipelineOrchestrator:
         console.print()
 
         for i, scanner in enumerate(scanners, 1):
+            # Check cancellation flag between each scanner step
+            if cancel_event and cancel_event.is_set():
+                console.print("[yellow]Scan abgebrochen.[/yellow]")
+                break
             console.print(f"[bold][{i}/{len(scanners)}][/bold]", end=" ")
             result = scanner.execute(target, project.scan_results)
             project.scan_results.append(result)

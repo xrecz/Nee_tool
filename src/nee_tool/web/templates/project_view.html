@@ -108,7 +108,15 @@
 {% endif %}
 
 <!-- Findings -->
-<h2>Findings ({{ findings | length }})</h2>
+<div style="display:flex;justify-content:space-between;align-items:center;margin:1.5rem 0 0.8rem;">
+  <h2 style="margin:0;">Findings ({{ findings | length }})</h2>
+  {% if findings %}
+  <div style="display:flex;gap:0.5rem;">
+    <a href="/project/export/csv?file={{ file }}" class="btn btn-sm">&#8595; CSV</a>
+    <a href="/project/export/json?file={{ file }}" class="btn btn-sm">&#8595; JSON</a>
+  </div>
+  {% endif %}
+</div>
 {% if findings %}
   {% for f in findings %}
   <div class="finding finding-{{ f.severity.value }}">

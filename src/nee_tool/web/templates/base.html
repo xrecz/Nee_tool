@@ -159,9 +159,11 @@
     <nav>
       <a href="/" {% if active == "dashboard" %}class="active"{% endif %}>&#9632; Dashboard</a>
       <a href="/scan" {% if active == "scan" %}class="active"{% endif %}>&#9654; Neuer Scan</a>
+      <a href="/history" {% if active == "history" %}class="active"{% endif %}>&#128337; Scan-History</a>
       <a href="/retest" {% if active == "retest" %}class="active"{% endif %}>&#8644; Re-Test</a>
       <a href="/compliance" {% if active == "compliance" %}class="active"{% endif %}>&#9745; Compliance</a>
       <a href="/templates" {% if active == "templates" %}class="active"{% endif %}>&#9830; Templates</a>
+      <a href="/phishing" {% if active == "phishing" %}class="active"{% endif %}>&#127907; Phishing</a>
     </nav>
   </aside>
   <main class="main">

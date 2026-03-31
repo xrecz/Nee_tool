@@ -25,11 +25,18 @@
       <span class="badge badge-running">Läuft...</span>
       {% elif job.status == "completed" %}
       <span class="badge badge-success">Fertig</span>
-      <a href="/project?file={{ job.result_file }}" class="btn btn-sm">Öffnen</a>
+      {% elif job.status == "cancelled" %}
+      <span class="badge badge-warning">Abgebrochen</span>
+      {% elif job.status == "failed" %}
+      <span class="badge badge-critical" style="background:rgba(248,113,113,0.2);color:var(--red);">Fehler</span>
       {% endif %}
     </td>
     <td>
-      {% if job.status == "completed" and job.result_file %}
+      {% if job.status == "running" %}
+      <form action="/scan/cancel/{{ job_id }}" method="POST" style="display:inline;" onsubmit="return confirm('Scan wirklich abbrechen?')">
+        <button type="submit" class="btn btn-sm btn-danger">&#9632; Stop</button>
+      </form>
+      {% elif job.status == "completed" and job.result_file %}
       <a href="/project?file={{ job.result_file }}" class="btn btn-sm btn-primary">Ergebnisse</a>
       {% endif %}
     </td>
@@ -42,18 +49,35 @@
 
 <!-- Scanner status -->
 <h2>Scanner-Module</h2>
+{% set missing_count = namespace(n=0) %}
+{% for name, missing in scanners.items() %}{% if missing %}{% set missing_count.n = missing_count.n + 1 %}{% endif %}{% endfor %}
+{% if missing_count.n > 0 %}
+<div class="card" style="border-left: 3px solid var(--yellow); background: rgba(251,191,36,0.07); margin-bottom:0.5rem;">
+  <strong style="color:var(--yellow);">&#9888; {{ missing_count.n }} Scanner-Tool(s) nicht gefunden</strong>
+  <p style="font-size:0.85rem; color:var(--fg2); margin-top:0.3rem;">
+    Fehlende Tools sind im Container nicht installiert. Die entsprechenden Scanner werden bei Scans übersprungen.
+  </p>
+</div>
+{% endif %}
 <div class="card">
 <table>
-  <thead><tr><th>Scanner</th><th>Status</th></tr></thead>
+  <thead><tr><th>Scanner</th><th>Status</th><th>Fehlende Tools</th></tr></thead>
   <tbody>
   {% for name, missing in scanners.items() %}
   <tr>
     <td>{{ name }}</td>
     <td>
       {% if missing %}
-      <span class="badge badge-warning">fehlt: {{ missing | join(", ") }}</span>
+      <span class="badge badge-warning">&#9888; fehlt</span>
       {% else %}
-      <span class="badge badge-success">verfügbar</span>
+      <span class="badge badge-success">&#10003; verfügbar</span>
+      {% endif %}
+    </td>
+    <td>
+      {% if missing %}
+      <span style="color:var(--yellow); font-family:monospace; font-size:0.85rem;">{{ missing | join(", ") }}</span>
+      {% else %}
+      <span style="color:var(--fg2);">—</span>
       {% endif %}
     </td>
   </tr>
