@@ -127,7 +127,10 @@
   <div class="finding finding-{{ f.severity.value }}">
     <div class="flex-between">
       <div class="title">{{ f.title }}</div>
-      <span class="badge badge-{{ f.severity.value }}">{{ f.severity.value | upper }}</span>
+      <div>
+        <span class="badge badge-{{ f.severity.value }}">{{ f.severity.value | upper }}</span>
+        {% for tag in f.tags %}{% if tag.startswith('CVSS: ') %}<span class="badge" style="background:#333;color:#fff;margin-left:4px;">{{ tag }}</span>{% endif %}{% if tag.startswith('cvss_vector:') %}<span class="badge" style="background:#333;color:#fff;margin-left:4px;" title="{{ tag[12:] }}">CVSS</span>{% endif %}{% endfor %}
+      </div>
     </div>
     <div class="desc">{{ f.description }}</div>
     {% if f.evidence %}

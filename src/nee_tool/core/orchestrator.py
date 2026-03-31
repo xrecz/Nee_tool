@@ -16,9 +16,11 @@ from rich.table import Table
 
 from nee_tool.core.config import Config
 from nee_tool.core.models import Project, ScanStatus, Severity
+from nee_tool.scanners.api_discovery import APIDiscoveryScanner
 from nee_tool.scanners.base import BaseScanner
 from nee_tool.scanners.crawler import CrawlerScanner
 from nee_tool.scanners.cve_enrichment import CVEEnrichmentScanner
+from nee_tool.scanners.default_creds import DefaultCredsScanner
 from nee_tool.scanners.dir_bruteforce import DirBruteforceScanner
 from nee_tool.scanners.nuclei import NucleiScanner
 from nee_tool.scanners.portscan import PortScanner
@@ -26,6 +28,7 @@ from nee_tool.scanners.security_headers import SecurityHeadersScanner
 from nee_tool.scanners.ssl_check import SSLCheckScanner
 from nee_tool.scanners.subdomain import SubdomainScanner
 from nee_tool.scanners.tech_detect import TechDetectScanner
+from nee_tool.scanners.waf_detect import WAFDetectScanner
 from nee_tool.scanners.web_discovery import WebDiscoveryScanner
 
 console = Console()
@@ -42,6 +45,9 @@ SCANNER_REGISTRY: dict[str, type[BaseScanner]] = {
     "nuclei": NucleiScanner,
     "dir_bruteforce": DirBruteforceScanner,
     "cve_enrichment": CVEEnrichmentScanner,
+    "waf_detect": WAFDetectScanner,
+    "api_discovery": APIDiscoveryScanner,
+    "default_creds": DefaultCredsScanner,
 }
 
 

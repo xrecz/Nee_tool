@@ -107,6 +107,39 @@
     line-height: 1.8;
   }
 
+  /* ── Risk Rating Badge ──────────────────────── */
+  .risk-rating {
+    display: inline-block;
+    padding: 0.5em 1.5em;
+    border-radius: 8px;
+    color: white;
+    font-size: 14pt;
+    font-weight: 700;
+    letter-spacing: 1px;
+    margin: 0.5em 0;
+  }
+
+  /* ── Executive Summary ──────────────────────── */
+  .exec-summary {
+    page-break-after: always;
+  }
+  .exec-top-finding {
+    background: #fff8f8;
+    border-left: 4px solid #dc3545;
+    padding: 0.8em 1em;
+    margin: 0.5em 0;
+  }
+  .exec-top-finding .title {
+    font-weight: 600;
+    color: #dc3545;
+  }
+  .exec-recommendation {
+    background: #e8f5e9;
+    border-left: 3px solid #4caf50;
+    padding: 0.6em 1em;
+    margin: 0.3em 0;
+  }
+
   /* ── Stats Grid ─────────────────────────────── */
   .stats-grid {
     display: flex;
@@ -188,6 +221,14 @@
     background: rgba(255,255,255,0.25);
     font-size: 9pt;
     font-weight: 600;
+  }
+  .finding-header .cvss-badge {
+    padding: 0.2em 0.6em;
+    border-radius: 20px;
+    background: rgba(0,0,0,0.3);
+    font-size: 9pt;
+    font-weight: 600;
+    margin-left: 0.5em;
   }
   .sev-critical .finding-header { background: #dc3545; }
   .sev-high .finding-header { background: #e67e22; }
@@ -277,7 +318,7 @@
 <div class="toc">
   <h2>Inhaltsverzeichnis</h2>
   <ul>
-    <li><span class="section-num">1</span> Management Summary</li>
+    <li><span class="section-num">1</span> Executive Summary</li>
     <li><span class="section-num">2</span> Scope & Methodik</li>
     <li><span class="section-num">3</span> Ergebnisübersicht</li>
     <li><span class="section-num">4</span> Entdeckte Hosts & Dienste</li>
@@ -286,12 +327,30 @@
   </ul>
 </div>
 
-<!-- ═══════════════════════ MANAGEMENT SUMMARY ═══════════════════════ -->
-<h2>1. Management Summary</h2>
+<!-- ═══════════════════════ EXECUTIVE SUMMARY ═══════════════════════ -->
+<div class="exec-summary">
+<h2>1. Executive Summary</h2>
 
+{% if meta.summary %}
 <div class="summary-box">
-  {{ meta.summary | default("Im Rahmen des durchgeführten Penetrationstests wurden die externen Systeme und Webanwendungen des Auftraggebers auf Sicherheitslücken untersucht. Die nachfolgenden Ergebnisse zeigen die identifizierten Schwachstellen, priorisiert nach Schweregrad.", true) }}
+  {{ meta.summary }}
 </div>
+{% else %}
+<div class="summary-box">
+  Im Rahmen des durchgeführten Penetrationstests wurden die externen Systeme und
+  Webanwendungen des Auftraggebers auf Sicherheitslücken untersucht. Insgesamt
+  wurden <strong>{{ exec_summary.total_hosts }} Hosts</strong> analysiert und
+  <strong>{{ exec_summary.total_findings }} Findings</strong> identifiziert.
+</div>
+{% endif %}
+
+<h3>1.1 Gesamtrisikobewertung</h3>
+<div style="text-align:center; margin:1em 0;">
+  <span class="risk-rating" style="background:{{ exec_summary.risk_color }}">
+    {{ exec_summary.risk_rating }}
+  </span>
+</div>
+<p>{{ exec_summary.risk_description }}</p>
 
 <div class="stats-grid">
   <div class="stat-card stat-critical">
@@ -326,6 +385,22 @@
   {% if counts.info %}<div class="stat-info" style="flex:{{ counts.info }}">{{ counts.info }}</div>{% endif %}
 </div>
 {% endif %}
+
+{% if exec_summary.top_findings %}
+<h3>1.2 Kritischste Findings</h3>
+{% for f in exec_summary.top_findings %}
+<div class="exec-top-finding">
+  <div class="title">{{ f.severity.value | upper }}: {{ f.title }}</div>
+  <div style="font-size:9.5pt; color:#555; margin-top:0.3em;">{{ f.description[:200] }}{% if f.description|length > 200 %}...{% endif %}</div>
+</div>
+{% endfor %}
+{% endif %}
+
+<h3>1.3 Empfehlungen</h3>
+{% for rec in exec_summary.recommendations %}
+<div class="exec-recommendation">{{ loop.index }}. {{ rec }}</div>
+{% endfor %}
+</div>
 
 <!-- ═══════════════════════ SCOPE & METHODIK ═══════════════════════ -->
 <h2>2. Scope & Methodik</h2>
@@ -403,11 +478,26 @@
 <div class="finding sev-{{ finding.severity.value }}">
   <div class="finding-header">
     <h3>{{ loop.index }}. {{ finding.title }}</h3>
-    <span class="badge">{{ finding.severity.value | upper }}</span>
+    <div>
+      <span class="badge">{{ finding.severity.value | upper }}</span>
+      {% if loop.index0 in cvss_map %}
+      <span class="cvss-badge">CVSS {{ cvss_map[loop.index0].score }}</span>
+      {% endif %}
+    </div>
   </div>
   <div class="finding-body">
     <h4>Beschreibung</h4>
     <p>{{ finding.description }}</p>
+
+    {% if loop.index0 in cvss_map %}
+    <h4>CVSS v3.1</h4>
+    <p>
+      <strong>Score:</strong> {{ cvss_map[loop.index0].score }}
+      {% if cvss_map[loop.index0].vector %}
+      <br><strong>Vector:</strong> <code>{{ cvss_map[loop.index0].vector }}</code>
+      {% endif %}
+    </p>
+    {% endif %}
 
     {% if finding.evidence %}
     <h4>Proof of Concept / Evidence</h4>
@@ -429,7 +519,9 @@
     {% if finding.tags %}
     <div class="tags">
       {% for tag in finding.tags %}
+      {% if not tag.startswith('cvss_vector:') and not tag.startswith('Vector:') %}
       <span class="tag">{{ tag }}</span>
+      {% endif %}
       {% endfor %}
     </div>
     {% endif %}
