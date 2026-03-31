@@ -6,7 +6,7 @@
 <h1>Bericht generieren</h1>
 <p style="color:var(--fg2);margin-bottom:1.5rem;">Projekt: <strong>{{ project.name }}</strong> | Target: {{ project.target }}</p>
 
-<div class="card" style="max-width:600px;">
+<div class="card" style="max-width:700px;">
   <div class="form-group">
     <label for="client">Auftraggeber / Firmenname *</label>
     <input type="text" id="client" placeholder="Firma XYZ GmbH">
@@ -15,6 +15,21 @@
   <div class="form-group">
     <label for="author">Autor</label>
     <input type="text" id="author" value="Security Team">
+  </div>
+
+  <div class="form-group">
+    <label for="date_range">Testzeitraum</label>
+    <input type="text" id="date_range" placeholder="01.03.2026 - 31.03.2026">
+  </div>
+
+  <div class="form-group">
+    <label for="version">Version</label>
+    <input type="text" id="version" value="1.0" placeholder="1.0">
+  </div>
+
+  <div class="form-group">
+    <label for="summary">Zusammenfassung / Management Summary</label>
+    <textarea id="summary" rows="5" placeholder="Projektbeschreibung und übergeordnete Bewertung..."></textarea>
   </div>
 
   <div style="display:flex;gap:0.5rem;margin-top:1.5rem;">
@@ -26,10 +41,15 @@
 
 <script>
 function download(format) {
-  const client = encodeURIComponent(document.getElementById('client').value);
-  const author = encodeURIComponent(document.getElementById('author').value);
-  const file = encodeURIComponent('{{ file }}');
-  window.location.href = `/report/generate?file=${file}&client=${client}&author=${author}&format=${format}`;
+  const client     = encodeURIComponent(document.getElementById('client').value);
+  const author     = encodeURIComponent(document.getElementById('author').value);
+  const date_range = encodeURIComponent(document.getElementById('date_range').value);
+  const version    = encodeURIComponent(document.getElementById('version').value);
+  const summary    = encodeURIComponent(document.getElementById('summary').value);
+  const file       = encodeURIComponent('{{ file }}');
+  window.location.href =
+    `/report/generate?file=${file}&client=${client}&author=${author}` +
+    `&date_range=${date_range}&version=${version}&summary=${summary}&format=${format}`;
 }
 </script>
 {% endblock %}

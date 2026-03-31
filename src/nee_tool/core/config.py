@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import os
 from pathlib import Path
 from pydantic import BaseModel, Field
 
@@ -41,6 +42,9 @@ class ScanConfig(BaseModel):
     nuclei_rate_limit: int = 100
     nuclei_tags: str = "cve,misconfig,exposure,vuln"
 
+    # CVE enrichment — NVD API key (increases rate limit from 5/30s to 50/30s)
+    nvd_api_key: str = ""
+
     # General
     max_concurrent: int = 5
     timeout_per_scanner: int = 600  # 10 min default
@@ -72,8 +76,13 @@ class Config(BaseModel):
     output_dir: str = "./output"
 
     @classmethod
-    def default(cls) -> Config:
-        return cls()
+    def default(cls) -> "Config":
+        """Create default config, pulling NVD_API_KEY from environment if set."""
+        nvd_key = os.getenv("NVD_API_KEY", "")
+        instance = cls()
+        if nvd_key:
+            instance.scan.nvd_api_key = nvd_key
+        return instance
 
     def project_dir(self, project_name: str) -> Path:
         path = Path(self.output_dir) / project_name
