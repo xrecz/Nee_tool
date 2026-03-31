@@ -20,12 +20,16 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     curl \
     wget \
     git \
+    unzip \
     ca-certificates \
     && rm -rf /var/lib/apt/lists/*
 
-# ── katana via Go (nicht in Kali apt verfuegbar) ──────────
-ENV PATH="/root/go/bin:${PATH}"
-RUN go install github.com/projectdiscovery/katana/cmd/katana@latest
+# ── katana via prebuilt binary (go install hat CGO-Bug mit Kali-Go) ──
+RUN KATANA_VER=$(curl -s https://api.github.com/repos/projectdiscovery/katana/releases/latest | grep '"tag_name"' | cut -d'"' -f4) \
+    && curl -sL "https://github.com/projectdiscovery/katana/releases/download/${KATANA_VER}/katana_${KATANA_VER#v}_linux_amd64.zip" -o /tmp/katana.zip \
+    && unzip /tmp/katana.zip katana -d /usr/local/bin/ \
+    && chmod +x /usr/local/bin/katana \
+    && rm /tmp/katana.zip
 
 # ── App setup ─────────────────────────────────────────────
 WORKDIR /app
